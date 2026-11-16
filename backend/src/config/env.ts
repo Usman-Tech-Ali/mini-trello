@@ -20,6 +20,12 @@ const envSchema = z.object({
     )
     .pipe(z.array(originSchema).min(1, 'At least one origin is required')),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  JWT_SECRET: z.string().min(32, 'Must be at least 32 characters (use a long random value)'),
+  // Defaults to true in production. Must be true when COOKIE_SAME_SITE=none.
+  COOKIE_SECURE: z.stringbool().optional(),
+  COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  // Max auth attempts per IP per 15 minutes (failed attempts only, for login).
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
 });
 
 function loadConfig() {
@@ -28,6 +34,12 @@ function loadConfig() {
     throw new Error(`Invalid environment configuration:\n${z.prettifyError(parsed.error)}`);
   }
   const env = parsed.data;
+  const cookieSecure = env.COOKIE_SECURE ?? env.NODE_ENV === 'production';
+  if (env.COOKIE_SAME_SITE === 'none' && !cookieSecure) {
+    throw new Error(
+      'Invalid environment configuration: COOKIE_SAME_SITE=none requires COOKIE_SECURE=true',
+    );
+  }
   return {
     nodeEnv: env.NODE_ENV,
     isProduction: env.NODE_ENV === 'production',
@@ -35,6 +47,9 @@ function loadConfig() {
     mongodbUri: env.MONGODB_URI,
     corsOrigins: env.CORS_ORIGINS,
     logLevel: env.LOG_LEVEL,
+    jwtSecret: env.JWT_SECRET,
+    cookie: { secure: cookieSecure, sameSite: env.COOKIE_SAME_SITE },
+    authRateLimitMax: env.AUTH_RATE_LIMIT_MAX,
   } as const;
 }
 

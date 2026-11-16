@@ -5,11 +5,19 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, type ReactNode } from 'react';
 
 import { Toaster } from '@/components/ui/sonner';
+import { setSession } from '@/features/auth/hooks/use-session';
 import { createQueryClient } from '@/lib/query/query-client';
 
 export function Providers({ children }: { children: ReactNode }) {
   // One client per browser session; useState keeps it stable across re-renders.
-  const [queryClient] = useState(createQueryClient);
+  const [queryClient] = useState(() =>
+    createQueryClient({
+      // Any 401 means the session is gone: mark the user signed out; the auth guard redirects.
+      onUnauthorized: (client) => {
+        setSession(client, null);
+      },
+    }),
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

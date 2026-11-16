@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 
 import { ApiError } from '@/lib/api/api-error';
 
@@ -10,8 +10,19 @@ function isRetryable(error: Error): boolean {
   return error.isNetworkError || error.status >= 500;
 }
 
-export function createQueryClient(): QueryClient {
-  return new QueryClient({
+interface QueryClientOptions {
+  /** Called whenever any request fails with 401, i.e. the session expired or was revoked. */
+  onUnauthorized: (client: QueryClient) => void;
+}
+
+export function createQueryClient({ onUnauthorized }: QueryClientOptions): QueryClient {
+  const handleError = (error: Error) => {
+    if (error instanceof ApiError && error.status === 401) onUnauthorized(client);
+  };
+
+  const client: QueryClient = new QueryClient({
+    queryCache: new QueryCache({ onError: handleError }),
+    mutationCache: new MutationCache({ onError: handleError }),
     defaultOptions: {
       queries: {
         // Socket.IO events keep board data fresh, so aggressive background refetching isn't needed.
@@ -24,4 +35,5 @@ export function createQueryClient(): QueryClient {
       },
     },
   });
+  return client;
 }

@@ -11,6 +11,12 @@ export const errorCodeSchema = z.enum([
   'PAYLOAD_TOO_LARGE',
   'RATE_LIMITED',
   'INTERNAL_ERROR',
+  // Domain-specific codes
+  'INVALID_CREDENTIALS',
+  'EMAIL_TAKEN',
+  'USER_NOT_FOUND',
+  'ALREADY_MEMBER',
+  'LAST_ADMIN',
 ]);
 
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
