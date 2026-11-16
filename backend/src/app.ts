@@ -10,6 +10,7 @@ import { originCheck } from './middleware/origin-check';
 import { requestLogger } from './middleware/request-logger';
 import { authRouter } from './modules/auth/auth.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { workspacesRouter } from './modules/workspaces/workspaces.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -23,6 +24,7 @@ export function createApp(): Express {
 
   app.use('/health', healthRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/workspaces', workspacesRouter);
 
   app.use(notFound);
   app.use(errorHandler);
