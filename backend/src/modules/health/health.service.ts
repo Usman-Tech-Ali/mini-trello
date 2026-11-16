@@ -1,14 +1,10 @@
 import type { DatabaseHealth } from '@mini-trello/shared';
 import mongoose from 'mongoose';
 
+import { supportsTransactions, type HelloResponse } from '../../db/connection';
 import { withTimeout } from '../../lib/with-timeout';
 
 const DB_CHECK_TIMEOUT_MS = 2_000;
-
-interface HelloResponse {
-  setName?: string;
-  msg?: string;
-}
 
 export async function checkDatabase(): Promise<DatabaseHealth> {
   const db = mongoose.connection.db;
@@ -26,8 +22,7 @@ export async function checkDatabase(): Promise<DatabaseHealth> {
     return {
       status: 'up',
       latencyMs: Math.round(performance.now() - startedAt),
-      // Replica set members report `setName`; mongos (sharded cluster) reports `msg: "isdbgrid"`.
-      transactionsSupported: typeof hello.setName === 'string' || hello.msg === 'isdbgrid',
+      transactionsSupported: supportsTransactions(hello),
     };
   } catch {
     return { status: 'down', latencyMs: null, transactionsSupported: null };

@@ -1,16 +1,21 @@
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { randomUUID } from 'node:crypto';
 
-import { connectDatabase, disconnectDatabase } from '../db/connection';
+import mongoose from 'mongoose';
+import { inject } from 'vitest';
+
+import { connectDatabase, disconnectDatabase, initModels } from '../db/connection';
 
 /**
- * Starts a single-node in-memory replica set (so transactions work, matching production)
- * and connects Mongoose to it. Returns a function that tears everything down.
+ * Connects Mongoose to a fresh database on the shared in-memory replica set (see global-setup.ts),
+ * so transactions work as in production. Returns a function that drops the database and disconnects.
  */
 export async function startTestDatabase(): Promise<() => Promise<void>> {
-  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
-  await connectDatabase(replSet.getUri());
+  await connectDatabase(inject('mongoUri'), `test-${randomUUID()}`);
+  await initModels();
   return async () => {
+    if (mongoose.connection.readyState === mongoose.ConnectionStates.connected) {
+      await mongoose.connection.dropDatabase();
+    }
     await disconnectDatabase();
-    await replSet.stop();
   };
 }

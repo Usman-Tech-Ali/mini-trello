@@ -2,13 +2,20 @@ import { createServer } from 'node:http';
 
 import { createApp } from './app';
 import { config } from './config/env';
-import { connectDatabase, disconnectDatabase } from './db/connection';
+import {
+  assertTransactionsSupported,
+  connectDatabase,
+  disconnectDatabase,
+  initModels,
+} from './db/connection';
 import { logger } from './lib/logger';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 async function main(): Promise<void> {
   await connectDatabase(config.mongodbUri);
+  await assertTransactionsSupported();
+  await initModels();
   logger.info('Connected to MongoDB');
 
   const server = createServer(createApp());
