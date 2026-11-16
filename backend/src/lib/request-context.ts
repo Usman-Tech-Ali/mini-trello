@@ -10,6 +10,7 @@ export function getAuthUserId(req: Request): string {
 }
 
 export function getMembership(req: Request): MembershipContext {
-  if (!req.membership) throw new Error('requireWorkspaceMember middleware is missing on this route');
+  if (!req.membership)
+    throw new Error('requireWorkspaceMember middleware is missing on this route');
   return req.membership;
 }

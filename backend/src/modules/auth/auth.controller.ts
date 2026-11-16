@@ -6,7 +6,12 @@ import { AppError } from '../../lib/app-error';
 import { getAuthUserId } from '../../lib/request-context';
 import { parseInput } from '../../lib/validate';
 import { authenticate, findUserById, registerUser } from './auth.service';
-import { SESSION_COOKIE, SESSION_TTL_SECONDS, sessionCookieOptions, signSessionToken } from './session';
+import {
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+  sessionCookieOptions,
+  signSessionToken,
+} from './session';
 
 async function startSession(res: Response, user: UserDto): Promise<void> {
   const token = await signSessionToken(user.id);

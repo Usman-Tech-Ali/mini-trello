@@ -21,7 +21,13 @@ export function createAuthRateLimiter({
     legacyHeaders: false,
     skipSuccessfulRequests: failedOnly,
     handler: (_req, _res, next) => {
-      next(new AppError(429, 'RATE_LIMITED', 'Too many attempts. Please wait a few minutes and try again.'));
+      next(
+        new AppError(
+          429,
+          'RATE_LIMITED',
+          'Too many attempts. Please wait a few minutes and try again.',
+        ),
+      );
     },
   });
 }

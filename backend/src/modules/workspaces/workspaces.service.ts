@@ -81,7 +81,10 @@ export async function listWorkspaces(userId: string): Promise<WorkspaceDto[]> {
   });
 }
 
-export async function getWorkspace(workspaceId: string, role: WorkspaceRole): Promise<WorkspaceDto> {
+export async function getWorkspace(
+  workspaceId: string,
+  role: WorkspaceRole,
+): Promise<WorkspaceDto> {
   const workspace = await WorkspaceModel.findById(workspaceId).lean();
   if (!workspace) throw new AppError(404, 'NOT_FOUND', WORKSPACE_NOT_FOUND);
   return toWorkspaceDto(workspace, role);
@@ -108,7 +111,11 @@ export async function addMember(workspaceId: string, email: string): Promise<Mem
     });
   }
   try {
-    const membership = await MembershipModel.create({ workspaceId, userId: user._id, role: 'member' });
+    const membership = await MembershipModel.create({
+      workspaceId,
+      userId: user._id,
+      role: 'member',
+    });
     return toMemberDto(membership, user);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
@@ -163,7 +170,11 @@ export async function updateMemberRole(
     if (role === 'member') {
       await decrementAdminCount(workspaceId, session);
     } else {
-      await WorkspaceModel.updateOne({ _id: workspaceId }, { $inc: { adminCount: 1 } }, { session });
+      await WorkspaceModel.updateOne(
+        { _id: workspaceId },
+        { $inc: { adminCount: 1 } },
+        { session },
+      );
     }
     target.role = role;
     await target.save({ session });

@@ -4,7 +4,11 @@ import type {
   WorkspaceListResponse,
   WorkspaceResponse,
 } from '@mini-trello/shared';
-import { addMemberSchema, createWorkspaceSchema, updateMemberRoleSchema } from '@mini-trello/shared';
+import {
+  addMemberSchema,
+  createWorkspaceSchema,
+  updateMemberRoleSchema,
+} from '@mini-trello/shared';
 import type { Request, Response } from 'express';
 
 import { getAuthUserId, getMembership } from '../../lib/request-context';
@@ -39,7 +43,10 @@ export async function members(req: Request, res: Response<MemberListResponse>): 
   res.json({ members: await listMembers(getMembership(req).workspaceId) });
 }
 
-export async function addWorkspaceMember(req: Request, res: Response<MemberResponse>): Promise<void> {
+export async function addWorkspaceMember(
+  req: Request,
+  res: Response<MemberResponse>,
+): Promise<void> {
   const { email } = parseInput(addMemberSchema, req.body);
   const member = await addMember(getMembership(req).workspaceId, email);
   res.status(201).json({ member });

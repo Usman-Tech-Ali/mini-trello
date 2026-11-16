@@ -65,7 +65,10 @@ describe('POST /api/auth/register', () => {
   it('rejects a duplicate email regardless of case', async () => {
     const email = uniqueEmail();
     const client = createClient(app);
-    await client.post('/api/auth/register').send({ name: 'A', email, password: TEST_PASSWORD }).expect(201);
+    await client
+      .post('/api/auth/register')
+      .send({ name: 'A', email, password: TEST_PASSWORD })
+      .expect(201);
 
     const res = await client
       .post('/api/auth/register')
@@ -100,7 +103,10 @@ describe('POST /api/auth/login', () => {
 
   it('starts a session with valid credentials', async () => {
     const client = createClient(app);
-    const res = await client.post('/api/auth/login').send({ email, password: TEST_PASSWORD }).expect(200);
+    const res = await client
+      .post('/api/auth/login')
+      .send({ email, password: TEST_PASSWORD })
+      .expect(200);
     expect((res.body as AuthResponse).user.email).toBe(email);
     const me = await client.get('/api/auth/me').expect(200);
     expect((me.body as AuthResponse).user.email).toBe(email);
@@ -155,9 +161,13 @@ describe('session lifecycle', () => {
 describe('createAuthRateLimiter', () => {
   function buildApp(failedOnly: boolean) {
     const limited = express();
-    limited.post('/attempt/:outcome', createAuthRateLimiter({ limit: 2, failedOnly }), (req, res) => {
-      res.status(req.params.outcome === 'ok' ? 200 : 401).end();
-    });
+    limited.post(
+      '/attempt/:outcome',
+      createAuthRateLimiter({ limit: 2, failedOnly }),
+      (req, res) => {
+        res.status(req.params.outcome === 'ok' ? 200 : 401).end();
+      },
+    );
     limited.use(errorHandler);
     return limited;
   }

@@ -17,7 +17,12 @@ function toFieldErrors(error: z.ZodError): FieldErrors {
 export function parseInput<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
   const result = schema.safeParse(input);
   if (!result.success) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Some fields are invalid.', toFieldErrors(result.error));
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Some fields are invalid.',
+      toFieldErrors(result.error),
+    );
   }
   return result.data;
 }

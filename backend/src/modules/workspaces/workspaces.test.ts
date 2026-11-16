@@ -188,7 +188,10 @@ describe('membership management', () => {
     expect((promoted.body as MemberResponse).member.role).toBe('admin');
     expect((await WorkspaceModel.findById(workspace.id))?.adminCount).toBe(2);
 
-    await admin.client.patch(`${base}/members/${member.user.id}`).send({ role: 'member' }).expect(200);
+    await admin.client
+      .patch(`${base}/members/${member.user.id}`)
+      .send({ role: 'member' })
+      .expect(200);
     expect((await WorkspaceModel.findById(workspace.id))?.adminCount).toBe(1);
   });
 
@@ -204,7 +207,10 @@ describe('membership management', () => {
   });
 
   it('keeps exactly one admin when two admins demote each other at the same time', async () => {
-    await admin.client.patch(`${base}/members/${member.user.id}`).send({ role: 'admin' }).expect(200);
+    await admin.client
+      .patch(`${base}/members/${member.user.id}`)
+      .send({ role: 'admin' })
+      .expect(200);
 
     const results = await Promise.all([
       admin.client.patch(`${base}/members/${member.user.id}`).send({ role: 'member' }),
@@ -214,7 +220,9 @@ describe('membership management', () => {
     const statuses = results.map((r) => r.status).sort();
     expect(statuses[0]).toBe(200);
     expect([403, 409]).toContain(statuses[1]);
-    expect(await MembershipModel.countDocuments({ workspaceId: workspace.id, role: 'admin' })).toBe(1);
+    expect(await MembershipModel.countDocuments({ workspaceId: workspace.id, role: 'admin' })).toBe(
+      1,
+    );
     expect((await WorkspaceModel.findById(workspace.id))?.adminCount).toBe(1);
   });
 
@@ -229,7 +237,10 @@ describe('membership management', () => {
   });
 
   it('rejects invalid roles and unknown members', async () => {
-    await admin.client.patch(`${base}/members/${member.user.id}`).send({ role: 'owner' }).expect(400);
+    await admin.client
+      .patch(`${base}/members/${member.user.id}`)
+      .send({ role: 'owner' })
+      .expect(400);
     await admin.client
       .patch(`${base}/members/507f1f77bcf86cd799439011`)
       .send({ role: 'admin' })

@@ -36,7 +36,9 @@ function loadConfig() {
   const env = parsed.data;
   const cookieSecure = env.COOKIE_SECURE ?? env.NODE_ENV === 'production';
   if (env.COOKIE_SAME_SITE === 'none' && !cookieSecure) {
-    throw new Error('Invalid environment configuration: COOKIE_SAME_SITE=none requires COOKIE_SECURE=true');
+    throw new Error(
+      'Invalid environment configuration: COOKIE_SAME_SITE=none requires COOKIE_SECURE=true',
+    );
   }
   return {
     nodeEnv: env.NODE_ENV,
