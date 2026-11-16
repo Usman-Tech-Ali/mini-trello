@@ -21,7 +21,7 @@ const loginMock = vi.mocked(login);
 const registerMock = vi.mocked(register);
 const user = { id: '507f1f77bcf86cd799439011', name: 'Ada', email: 'ada@example.com' };
 
-function fill(label: RegExp, value: string) {
+function fill(label: RegExp | string, value: string) {
   fireEvent.input(screen.getByLabelText(label), { target: { value } });
 }
 
@@ -49,7 +49,7 @@ describe('LoginForm', () => {
     renderWithQueryClient(<LoginForm />);
 
     fill(/email/i, 'ada@example.com');
-    fill(/password/i, 'wrong-password');
+    fill('Password', 'wrong-password');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Email or password is incorrect.');
@@ -62,7 +62,7 @@ describe('LoginForm', () => {
     renderWithQueryClient(<LoginForm />);
 
     fill(/email/i, '  ADA@Example.com ');
-    fill(/password/i, 'correct-horse');
+    fill('Password', 'correct-horse');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     await waitFor(() => {
@@ -86,7 +86,7 @@ describe('RegisterForm', () => {
 
     fill(/name/i, 'Ada');
     fill(/email/i, 'ada@example.com');
-    fill(/password/i, 'long-enough-password');
+    fill('Password', 'long-enough-password');
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
     const message = await screen.findByText('An account with this email already exists.');
@@ -101,10 +101,24 @@ describe('RegisterForm', () => {
 
     fill(/name/i, 'Ada');
     fill(/email/i, 'ada@example.com');
-    fill(/password/i, 'short');
+    fill('Password', 'short');
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByText('Password must be at least 8 characters')).toBeInTheDocument();
     expect(registerMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('PasswordInput toggle', () => {
+  it('reveals and hides the password', () => {
+    renderWithQueryClient(<LoginForm />);
+    const input = screen.getByLabelText('Password');
+    expect(input).toHaveAttribute('type', 'password');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(input).toHaveAttribute('type', 'text');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(input).toHaveAttribute('type', 'password');
   });
 });

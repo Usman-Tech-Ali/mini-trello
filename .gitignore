@@ -12,5 +12,8 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Local test-session logs (see npm run logs:clear)
+logs/
+
 # Local tool caches (e.g. MongoDB test binaries in CI)
 .cache/

@@ -1,5 +1,5 @@
 import type { AddMemberInput, CreateWorkspaceInput, WorkspaceRole } from '@mini-trello/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   addMember,
@@ -19,17 +19,18 @@ export function useWorkspaces() {
   });
 }
 
-export function useWorkspace(workspaceId: string) {
+export function useWorkspace(workspaceId: string | undefined) {
   return useQuery({
-    queryKey: workspaceKeys.detail(workspaceId),
-    queryFn: ({ signal }) => getWorkspace(workspaceId, signal),
+    queryKey: workspaceKeys.detail(workspaceId ?? ''),
+    // skipToken: the query can never run without an id, not even on refetch/invalidate.
+    queryFn: workspaceId ? ({ signal }) => getWorkspace(workspaceId, signal) : skipToken,
   });
 }
 
-export function useWorkspaceMembers(workspaceId: string) {
+export function useWorkspaceMembers(workspaceId: string | undefined) {
   return useQuery({
-    queryKey: workspaceKeys.members(workspaceId),
-    queryFn: ({ signal }) => listMembers(workspaceId, signal),
+    queryKey: workspaceKeys.members(workspaceId ?? ''),
+    queryFn: workspaceId ? ({ signal }) => listMembers(workspaceId, signal) : skipToken,
   });
 }
 

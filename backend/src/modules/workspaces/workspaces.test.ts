@@ -12,6 +12,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../app';
+import { addMember, createWorkspace } from '../../test/fixtures';
 import { registerUser, type TestUser } from '../../test/http';
 import { startTestDatabase } from '../../test/mongo-memory';
 import { MembershipModel } from './membership.model';
@@ -27,21 +28,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await stopDatabase?.();
 });
-
-async function createWorkspace(owner: TestUser, name = 'Team Space'): Promise<WorkspaceDto> {
-  const res = await owner.client
-    .post('/api/workspaces')
-    .send({ name, requestId: randomUUID() })
-    .expect(201);
-  return (res.body as WorkspaceResponse).workspace;
-}
-
-async function addMember(admin: TestUser, workspaceId: string, member: TestUser): Promise<void> {
-  await admin.client
-    .post(`/api/workspaces/${workspaceId}/members`)
-    .send({ email: member.user.email })
-    .expect(201);
-}
 
 function errorCode(res: request.Response): string {
   return (res.body as ApiErrorResponse).error.code;

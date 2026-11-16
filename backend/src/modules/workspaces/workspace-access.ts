@@ -18,14 +18,23 @@ export interface MembershipContext {
 export const WORKSPACE_NOT_FOUND = 'Workspace not found.';
 export const MEMBER_NOT_FOUND = 'Member not found.';
 
+export async function findMembership(
+  userId: string,
+  workspaceId: string,
+  session?: ClientSession,
+): Promise<MembershipContext | null> {
+  const membership = await MembershipModel.findOne({ workspaceId, userId }, null, { session });
+  return membership ? { workspaceId, userId, role: membership.role } : null;
+}
+
 export async function assertWorkspaceMember(
   userId: string,
   workspaceId: string,
   session?: ClientSession,
 ): Promise<MembershipContext> {
-  const membership = await MembershipModel.findOne({ workspaceId, userId }, null, { session });
+  const membership = await findMembership(userId, workspaceId, session);
   if (!membership) throw new AppError(404, 'NOT_FOUND', WORKSPACE_NOT_FOUND);
-  return { workspaceId, userId, role: membership.role };
+  return membership;
 }
 
 export function assertWorkspaceAdmin(membership: MembershipContext): void {

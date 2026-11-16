@@ -1,9 +1,10 @@
+import { AuthLayout } from '@/features/auth/components/auth-layout';
 import { GuestGuard } from '@/features/auth/components/auth-guard';
 
-export default function AuthLayout({ children }: LayoutProps<'/'>) {
+export default function AuthRouteLayout({ children }: LayoutProps<'/'>) {
   return (
-    <main className="flex flex-1 items-center justify-center bg-muted/40 p-4">
+    <AuthLayout>
       <GuestGuard>{children}</GuestGuard>
-    </main>
+    </AuthLayout>
   );
 }
