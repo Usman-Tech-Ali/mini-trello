@@ -8,7 +8,7 @@ import { isDuplicateKeyError } from '../../lib/mongo-errors';
 import { type BoardAccess, type TaskAccess, TASK_NOT_FOUND } from '../boards/board-access';
 import { BoardModel } from '../boards/board.model';
 import { MembershipModel } from '../workspaces/membership.model';
-import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from './position';
+import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from '@mini-trello/shared';
 import { TaskModel } from './task.model';
 
 type CreateTaskData = z.output<typeof createTaskSchema>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from './position';
+import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from '@mini-trello/shared';
 
 describe('positionForIndex', () => {
   it('starts an empty column at the step', () => {

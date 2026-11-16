@@ -5,29 +5,29 @@ import { objectIdSchema, requestIdSchema } from './common';
 export const taskPrioritySchema = z.enum(['low', 'medium', 'high']);
 export type TaskPriority = z.infer<typeof taskPrioritySchema>;
 
-const titleSchema = z
+export const taskTitleSchema = z
   .string()
   .trim()
   .min(1, 'Title is required')
   .max(200, 'Title must be at most 200 characters');
 
-const descriptionSchema = z
+export const taskDescriptionSchema = z
   .string()
   .trim()
   .max(5000, 'Description must be at most 5000 characters');
 
 /** Calendar date without time, e.g. "2026-11-30". */
-const dueDateSchema = z.iso.date('Enter a valid date');
+export const taskDueDateSchema = z.iso.date('Enter a valid date');
 
 const versionSchema = z.number().int().positive();
 
 export const createTaskSchema = z.object({
-  title: titleSchema,
-  description: descriptionSchema.default(''),
+  title: taskTitleSchema,
+  description: taskDescriptionSchema.default(''),
   columnId: objectIdSchema,
   priority: taskPrioritySchema.default('medium'),
   assigneeId: objectIdSchema.nullable().default(null),
-  dueDate: dueDateSchema.nullable().default(null),
+  dueDate: taskDueDateSchema.nullable().default(null),
   requestId: requestIdSchema,
 });
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
@@ -36,11 +36,11 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export const updateTaskSchema = z
   .object({
     version: versionSchema,
-    title: titleSchema.optional(),
-    description: descriptionSchema.optional(),
+    title: taskTitleSchema.optional(),
+    description: taskDescriptionSchema.optional(),
     priority: taskPrioritySchema.optional(),
     assigneeId: objectIdSchema.nullable().optional(),
-    dueDate: dueDateSchema.nullable().optional(),
+    dueDate: taskDueDateSchema.nullable().optional(),
   })
   .refine((input) => Object.keys(input).some((key) => key !== 'version'), {
     message: 'Nothing to update',

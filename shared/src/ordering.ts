@@ -1,3 +1,5 @@
+/** Task ordering within a column, shared so the UI can place a moved card exactly like the API. */
+
 export const POSITION_STEP = 1024;
 const MIN_GAP = 1e-6;
 
