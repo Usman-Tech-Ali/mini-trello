@@ -8,6 +8,7 @@ import mongoose, { type ClientSession } from 'mongoose';
 
 import { AppError } from '../../lib/app-error';
 import { isDuplicateKeyError } from '../../lib/mongo-errors';
+import { TaskModel } from '../tasks/task.model';
 import { UserModel } from '../users/user.model';
 import { MembershipModel, type MembershipDocument } from './membership.model';
 import {
@@ -143,7 +144,7 @@ async function decrementAdminCount(workspaceId: string, session: ClientSession):
   }
 }
 
-async function findMembership(
+async function getTargetMembership(
   workspaceId: string,
   userId: string,
   session: ClientSession,
@@ -164,7 +165,7 @@ export async function updateMemberRole(
 ): Promise<MemberDto> {
   const membership = await mongoose.connection.transaction(async (session) => {
     assertWorkspaceAdmin(await assertWorkspaceMember(actorUserId, workspaceId, session));
-    const target = await findMembership(workspaceId, targetUserId, session);
+    const target = await getTargetMembership(workspaceId, targetUserId, session);
     if (target.role === role) return target;
 
     if (role === 'member') {
@@ -196,8 +197,14 @@ export async function removeMember(
     const actor = await assertWorkspaceMember(actorUserId, workspaceId, session);
     if (actorUserId !== targetUserId) assertWorkspaceAdmin(actor);
 
-    const target = await findMembership(workspaceId, targetUserId, session);
+    const target = await getTargetMembership(workspaceId, targetUserId, session);
     if (target.role === 'admin') await decrementAdminCount(workspaceId, session);
     await MembershipModel.deleteOne({ _id: target._id }, { session });
+    // Former members can't stay assigned to tasks they can no longer see.
+    await TaskModel.updateMany(
+      { workspaceId, assigneeId: targetUserId },
+      { $set: { assigneeId: null }, $inc: { version: 1 } },
+      { session },
+    );
   });
 }
