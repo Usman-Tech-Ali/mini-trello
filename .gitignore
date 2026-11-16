@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Environment files — only the examples are committed
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+# Local tool caches (e.g. MongoDB test binaries in CI)
+.cache/
