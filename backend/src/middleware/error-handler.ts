@@ -42,6 +42,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next
     appError = new AppError(500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');
   }
 
+  res.locals.errorCode = appError.code;
   const body: ApiErrorResponse = {
     error: {
       code: appError.code,

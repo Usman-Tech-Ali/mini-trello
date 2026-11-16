@@ -1,6 +1,25 @@
-import { pino } from 'pino';
+import { pino, type TransportTargetOptions } from 'pino';
 
 import { config } from '../config/env';
+
+const targets: TransportTargetOptions[] = [];
+if (config.nodeEnv === 'development') {
+  targets.push({
+    target: 'pino-pretty',
+    level: config.logLevel,
+    options: { colorize: true, translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' },
+  });
+} else if (config.logFile) {
+  targets.push({ target: 'pino/file', level: config.logLevel, options: { destination: 1 } });
+}
+if (config.logFile) {
+  // Structured JSON lines, e.g. for reviewing a manual test session afterwards.
+  targets.push({
+    target: 'pino/file',
+    level: config.logLevel,
+    options: { destination: config.logFile, mkdir: true },
+  });
+}
 
 export const logger = pino({
   level: config.logLevel,
@@ -15,10 +34,5 @@ export const logger = pino({
     ],
     censor: '[REDACTED]',
   },
-  ...(config.nodeEnv === 'development' && {
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true, translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' },
-    },
-  }),
+  ...(targets.length > 0 && { transport: { targets } }),
 });

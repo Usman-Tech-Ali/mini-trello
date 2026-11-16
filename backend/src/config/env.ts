@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import { z } from 'zod';
 
 const originSchema = z.url().refine((value) => new URL(value).origin === value, {
@@ -26,6 +28,8 @@ const envSchema = z.object({
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   // Max auth attempts per IP per 15 minutes (failed attempts only, for login).
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  // Optional JSON log file (e.g. ../logs/dev.log) in addition to stdout.
+  LOG_FILE: z.string().min(1).optional(),
 });
 
 function loadConfig() {
@@ -50,6 +54,7 @@ function loadConfig() {
     jwtSecret: env.JWT_SECRET,
     cookie: { secure: cookieSecure, sameSite: env.COOKIE_SAME_SITE },
     authRateLimitMax: env.AUTH_RATE_LIMIT_MAX,
+    logFile: env.LOG_FILE ? resolve(env.LOG_FILE) : undefined,
   } as const;
 }
 

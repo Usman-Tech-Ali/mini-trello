@@ -12,4 +12,9 @@ declare module 'express-serve-static-core' {
     /** Set by `requireTaskAccess`. */
     taskAccess?: TaskAccess;
   }
+
+  interface Locals {
+    /** Set by the error handler so request logs include the API error code. */
+    errorCode?: string;
+  }
 }
