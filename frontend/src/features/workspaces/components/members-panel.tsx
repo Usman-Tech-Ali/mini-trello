@@ -12,17 +12,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { ErrorState } from '@/components/feedback/error-state';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -191,41 +182,25 @@ export function MembersPanel({ workspace }: { workspace: WorkspaceDto }) {
         )}
       </CardContent>
 
-      <AlertDialog
+      <ConfirmDialog
         open={pendingRemoval !== null}
         onOpenChange={(open) => {
           if (!open) setPendingRemoval(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingRemoval?.isSelf
-                ? `Leave ${workspace.name}?`
-                : `Remove ${pendingRemoval?.member.name ?? 'member'}?`}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingRemoval?.isSelf
-                ? 'You will lose access to this workspace and its boards until an admin adds you again.'
-                : 'They will lose access to this workspace and its boards.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={removeMember.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={removeMember.isPending}
-              onClick={(event) => {
-                // Keep the dialog open until the request finishes.
-                event.preventDefault();
-                confirmRemoval();
-              }}
-            >
-              {pendingRemoval?.isSelf ? 'Leave' : 'Remove'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={
+          pendingRemoval?.isSelf
+            ? `Leave ${workspace.name}?`
+            : `Remove ${pendingRemoval?.member.name ?? 'member'}?`
+        }
+        description={
+          pendingRemoval?.isSelf
+            ? 'You will lose access to this workspace and its boards until an admin adds you again.'
+            : 'They will lose access to this workspace and its boards. Their tasks will become unassigned.'
+        }
+        confirmLabel={pendingRemoval?.isSelf ? 'Leave' : 'Remove'}
+        onConfirm={confirmRemoval}
+        isPending={removeMember.isPending}
+      />
     </Card>
   );
 }

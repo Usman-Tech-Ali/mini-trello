@@ -19,17 +19,19 @@ export function useWorkspaces() {
   });
 }
 
-export function useWorkspace(workspaceId: string) {
+export function useWorkspace(workspaceId: string | undefined) {
   return useQuery({
-    queryKey: workspaceKeys.detail(workspaceId),
-    queryFn: ({ signal }) => getWorkspace(workspaceId, signal),
+    queryKey: workspaceKeys.detail(workspaceId ?? ''),
+    queryFn: ({ signal }) => getWorkspace(workspaceId ?? '', signal),
+    enabled: !!workspaceId,
   });
 }
 
-export function useWorkspaceMembers(workspaceId: string) {
+export function useWorkspaceMembers(workspaceId: string | undefined) {
   return useQuery({
-    queryKey: workspaceKeys.members(workspaceId),
-    queryFn: ({ signal }) => listMembers(workspaceId, signal),
+    queryKey: workspaceKeys.members(workspaceId ?? ''),
+    queryFn: ({ signal }) => listMembers(workspaceId ?? '', signal),
+    enabled: !!workspaceId,
   });
 }
 
