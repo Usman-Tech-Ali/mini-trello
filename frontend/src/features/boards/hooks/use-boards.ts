@@ -1,5 +1,5 @@
 import type { BoardDto } from '@mini-trello/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   createBoard,
@@ -16,16 +16,15 @@ import { boardKeys } from '../api/boards.keys';
 export function useBoards(workspaceId: string | undefined) {
   return useQuery({
     queryKey: boardKeys.list(workspaceId ?? ''),
-    queryFn: ({ signal }) => listBoards(workspaceId ?? '', signal),
-    enabled: !!workspaceId,
+    // skipToken: the query can never run without an id, not even on refetch/invalidate.
+    queryFn: workspaceId ? ({ signal }) => listBoards(workspaceId, signal) : skipToken,
   });
 }
 
 export function useBoard(boardId: string | undefined) {
   return useQuery({
     queryKey: boardKeys.detail(boardId ?? ''),
-    queryFn: ({ signal }) => getBoard(boardId ?? '', signal),
-    enabled: !!boardId,
+    queryFn: boardId ? ({ signal }) => getBoard(boardId, signal) : skipToken,
   });
 }
 
