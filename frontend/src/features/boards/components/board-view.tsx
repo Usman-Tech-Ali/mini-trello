@@ -27,7 +27,7 @@ import { useBoardTasks, useMoveTask } from '@/features/tasks/hooks/use-tasks';
 import { groupTasksByColumn } from '@/features/tasks/lib/task-order';
 import { useWorkspace, useWorkspaceMembers } from '@/features/workspaces/hooks/use-workspaces';
 import { ApiError } from '@/lib/api/api-error';
-import { gradientFor, initialOf } from '@/lib/colors';
+import { initialOf, swatchFor } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 
 import { useBoard, useCreateColumn, useDeleteBoard, useRenameBoard } from '../hooks/use-boards';
@@ -135,17 +135,15 @@ function Board({ board }: { board: BoardDto }) {
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={cn(
-              'flex size-9 shrink-0 items-center justify-center rounded-lg bg-linear-to-br font-semibold text-white shadow-sm',
-              gradientFor(board.id),
+              'flex size-9 shrink-0 items-center justify-center rounded-lg font-semibold text-white shadow-sm',
+              swatchFor(board.id),
             )}
             aria-hidden="true"
           >
             {initialOf(board.name)}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-              {board.name}
-            </h1>
+            <h1 className="truncate font-display text-3xl tracking-tight">{board.name}</h1>
             <p className="text-sm text-muted-foreground">
               {tasksQuery.data ? `${tasksQuery.data.length} tasks` : 'Loading tasks…'} ·{' '}
               {board.columns.length} columns

@@ -92,7 +92,7 @@ export function LoginForm() {
         New to Mini Trello?{' '}
         <Link
           href="/register"
-          className="font-medium text-primary underline-offset-4 hover:underline"
+          className="font-medium text-brand-text underline underline-offset-4 hover:no-underline"
         >
           Create an account
         </Link>

@@ -12,7 +12,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { NameDialog } from '@/components/name-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { gradientFor } from '@/lib/colors';
+import { swatchFor } from '@/lib/colors';
 import { formatRelative } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -77,9 +77,23 @@ export function BoardGrid({ workspaceId }: { workspaceId: string }) {
                 href={`/boards/${board.id}`}
                 className="group block overflow-hidden rounded-xl border bg-card shadow-xs transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <div className={cn('h-16 bg-linear-to-br', gradientFor(board.id))} />
+                {/* Miniature of the board's columns instead of a decorative banner. */}
+                <div className="flex h-20 gap-1.5 border-b bg-muted/60 p-3" aria-hidden="true">
+                  {board.columns.slice(0, 4).map((column, i) => (
+                    <div
+                      key={column.id}
+                      className="flex flex-1 flex-col gap-1 rounded-md bg-background/80 p-1.5"
+                    >
+                      <span className="h-1 w-2/3 rounded-full bg-border" />
+                      {Array.from({ length: 2 - (i % 2) }, (_, j) => (
+                        <span key={j} className="h-2.5 rounded-sm border bg-card" />
+                      ))}
+                    </div>
+                  ))}
+                </div>
                 <div className="space-y-1 p-4">
-                  <p className="truncate font-medium transition-colors group-hover:text-primary">
+                  <p className="flex items-center gap-2 truncate font-medium transition-colors group-hover:text-brand-text">
+                    <span className={cn('size-2.5 shrink-0 rounded-full', swatchFor(board.id))} />
                     {board.name}
                   </p>
                   <p className="text-xs text-muted-foreground">

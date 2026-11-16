@@ -10,7 +10,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <AuthShowcase />
       <main className="flex flex-col px-6 py-8 sm:px-10">
         <div className="flex items-center gap-2 font-semibold lg:hidden">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-brand text-brand-foreground">
             <SquareKanbanIcon className="size-5" aria-hidden="true" />
           </span>
           Mini Trello
@@ -29,7 +29,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
 export function AuthHeader({ title, description }: { title: string; description: string }) {
   return (
     <div className="mb-8 space-y-2">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+      <h1 className="font-display text-4xl tracking-tight sm:text-5xl">{title}</h1>
       <p className="text-muted-foreground">{description}</p>
     </div>
   );

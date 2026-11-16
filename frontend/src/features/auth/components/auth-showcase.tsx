@@ -46,11 +46,13 @@ const columns: { title: string; count: number; cards: PreviewCard[] }[] = [
   },
 ];
 
-const presence = [
-  { initials: 'UA', className: 'bg-amber-300 text-amber-950' },
-  { initials: 'SK', className: 'bg-sky-300 text-sky-950' },
-  { initials: 'AR', className: 'bg-emerald-300 text-emerald-950' },
-];
+// Earthy avatar colours matching the workspace/board swatches.
+const avatarColors: Record<string, string> = {
+  UA: 'bg-[oklch(0.58_0.14_40)] text-white',
+  SK: 'bg-[oklch(0.55_0.07_155)] text-white',
+  AR: 'bg-[oklch(0.6_0.12_75)] text-white',
+  ZK: 'bg-[oklch(0.55_0.13_15)] text-white',
+};
 
 const highlights = [
   { icon: ZapIcon, label: 'Live updates' },
@@ -62,7 +64,8 @@ function Avatar({ initials, className }: { initials: string; className?: string 
   return (
     <span
       className={cn(
-        'flex size-5 items-center justify-center rounded-full bg-accent text-[9px] font-semibold text-accent-foreground',
+        'flex size-5 items-center justify-center rounded-full text-[9px] font-semibold',
+        avatarColors[initials] ?? 'bg-muted text-foreground',
         className,
       )}
     >
@@ -77,7 +80,7 @@ function TypingDots() {
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}
-          className="size-1 animate-typing rounded-full bg-primary"
+          className="size-1 animate-typing rounded-full bg-brand"
           style={{ animationDelay: `${delay}ms` }}
         />
       ))}
@@ -87,7 +90,7 @@ function TypingDots() {
 
 function Card({ card }: { card: PreviewCard }) {
   return (
-    <div className="space-y-2 rounded-lg bg-card p-2.5 text-card-foreground shadow-sm">
+    <div className="space-y-2 rounded-lg border bg-card p-2.5 text-card-foreground">
       <span
         className={cn(
           'inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold',
@@ -106,7 +109,7 @@ function Card({ card }: { card: PreviewCard }) {
       </p>
       <div className="flex items-center justify-between text-[9px] text-muted-foreground">
         {card.typing ? (
-          <span className="flex items-center gap-1 font-medium text-primary">
+          <span className="flex items-center gap-1 font-medium text-brand-text">
             {card.typing} is typing <TypingDots />
           </span>
         ) : card.done ? (
@@ -125,23 +128,14 @@ function Card({ card }: { card: PreviewCard }) {
 /** Decorative product preview shown beside the sign-in and sign-up forms on large screens. */
 export function AuthShowcase() {
   return (
-    <aside className="relative hidden overflow-hidden bg-[linear-gradient(135deg,oklch(0.5_0.21_266),oklch(0.42_0.22_288)_55%,oklch(0.24_0.11_272))] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
-      {/* Background texture */}
+    <aside className="relative hidden overflow-hidden bg-[oklch(0.2_0.012_60)] p-10 text-[oklch(0.96_0.006_80)] lg:flex lg:flex-col lg:justify-between xl:p-14">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.14)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)] bg-size-[22px_22px]"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -top-32 -right-24 size-96 rounded-full bg-fuchsia-400/30 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -bottom-40 -left-20 size-96 rounded-full bg-sky-400/20 blur-3xl"
+        className="absolute inset-0 bg-[radial-gradient(oklch(1_0_0/0.07)_1px,transparent_1px)] bg-size-[24px_24px]"
       />
 
-      <div className="relative flex items-center gap-2 text-lg font-semibold">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/25">
+      <div className="relative flex items-center gap-2.5 text-lg font-semibold">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-brand text-brand-foreground">
           <SquareKanbanIcon className="size-5" aria-hidden="true" />
         </span>
         Mini Trello
@@ -149,26 +143,26 @@ export function AuthShowcase() {
 
       {/* Product preview */}
       <div className="relative mx-auto w-full max-w-xl py-10" aria-hidden="true">
-        <div className="animate-float rounded-2xl border border-white/20 bg-white/10 p-4 shadow-2xl shadow-black/20 backdrop-blur-md">
+        <div className="animate-float rounded-2xl bg-background p-4 text-foreground shadow-2xl shadow-black/40">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Product launch</p>
-              <p className="text-[11px] text-white/70">Q4 roadmap · 13 tasks</p>
+              <p className="text-[11px] text-muted-foreground">Q4 roadmap · 13 tasks</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex -space-x-1.5">
-                {presence.map((person) => (
+                {['UA', 'SK', 'AR'].map((initials) => (
                   <Avatar
-                    key={person.initials}
-                    initials={person.initials}
-                    className={cn('size-6 text-[10px] ring-2 ring-white/40', person.className)}
+                    key={initials}
+                    initials={initials}
+                    className="size-6 text-[10px] ring-2 ring-background"
                   />
                 ))}
               </div>
-              <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium">
+              <span className="flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                 <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-75 motion-reduce:hidden" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-300" />
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60 motion-reduce:hidden" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-success" />
                 </span>
                 Live
               </span>
@@ -176,10 +170,10 @@ export function AuthShowcase() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             {columns.map((column) => (
-              <div key={column.title} className="space-y-2 rounded-xl bg-black/15 p-2">
-                <div className="flex items-center justify-between px-0.5 text-[11px] font-medium text-white/85">
+              <div key={column.title} className="space-y-2 rounded-xl bg-muted p-2">
+                <div className="flex items-center justify-between px-0.5 text-[11px] font-semibold">
                   {column.title}
-                  <span className="rounded-full bg-white/15 px-1.5 text-[10px]">
+                  <span className="rounded-full bg-background px-1.5 text-[10px] text-muted-foreground">
                     {column.count}
                   </span>
                 </div>
@@ -191,8 +185,8 @@ export function AuthShowcase() {
           </div>
         </div>
 
-        <div className="absolute bottom-2 -left-4 flex w-64 animate-float-delayed items-center gap-3 rounded-xl bg-card p-3 text-card-foreground shadow-xl xl:-left-8">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+        <div className="absolute bottom-2 -left-4 flex w-64 animate-float-delayed items-center gap-3 rounded-xl border bg-card p-3 text-card-foreground shadow-xl shadow-black/30 xl:-left-8">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
             <BellIcon className="size-4" />
           </span>
           <div className="min-w-0">
@@ -203,19 +197,19 @@ export function AuthShowcase() {
       </div>
 
       <div className="relative space-y-5">
-        <h2 className="max-w-md text-3xl leading-tight font-semibold tracking-tight xl:text-4xl">
-          Plan, track and ship together — in real time.
+        <h2 className="max-w-md font-display text-4xl leading-[1.05] tracking-tight xl:text-5xl">
+          Plan, track and ship together, <em className="text-brand">in real time.</em>
         </h2>
-        <p className="max-w-md text-white/75">
+        <p className="max-w-md text-[oklch(0.96_0.006_80/0.7)]">
           Boards your whole team can work on at once. Every change appears instantly for everyone.
         </p>
         <ul className="flex flex-wrap gap-2">
           {highlights.map(({ icon: Icon, label }) => (
             <li
               key={label}
-              className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium ring-1 ring-white/20"
+              className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 text-xs font-medium"
             >
-              <Icon className="size-3.5" aria-hidden="true" />
+              <Icon className="size-3.5 text-brand" aria-hidden="true" />
               {label}
             </li>
           ))}

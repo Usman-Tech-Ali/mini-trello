@@ -100,7 +100,7 @@ export function BoardColumn({
             {...provided.droppableProps}
             className={cn(
               'flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-1 transition-colors',
-              snapshot.isDraggingOver && 'rounded-lg bg-primary/5',
+              snapshot.isDraggingOver && 'rounded-lg bg-accent',
             )}
           >
             {tasks.map((task, index) => (

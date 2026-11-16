@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BoardGrid } from '@/features/boards/components/board-grid';
 import { ApiError } from '@/lib/api/api-error';
-import { gradientFor, initialOf } from '@/lib/colors';
+import { initialOf, swatchFor } from '@/lib/colors';
 import { formatDate } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -58,8 +58,8 @@ export function WorkspaceDetail({ workspaceId }: { workspaceId: string }) {
       <div className="flex flex-wrap items-center gap-4">
         <span
           className={cn(
-            'flex size-14 items-center justify-center rounded-2xl bg-linear-to-br text-2xl font-semibold text-white shadow-sm',
-            gradientFor(workspace.id),
+            'flex size-14 items-center justify-center rounded-2xl text-2xl font-semibold text-white shadow-sm',
+            swatchFor(workspace.id),
           )}
           aria-hidden="true"
         >
@@ -67,7 +67,7 @@ export function WorkspaceDetail({ workspaceId }: { workspaceId: string }) {
         </span>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="truncate font-display text-3xl tracking-tight sm:text-4xl">
               {workspace.name}
             </h1>
             <Badge variant={workspace.role === 'admin' ? 'default' : 'secondary'}>

@@ -1,13 +1,17 @@
-/** Stable decorative colour for an entity (workspace/board), derived from its id. */
-const GRADIENTS = [
-  'from-indigo-500 to-violet-500',
-  'from-sky-500 to-indigo-500',
-  'from-emerald-500 to-teal-500',
-  'from-amber-500 to-orange-500',
-  'from-rose-500 to-pink-500',
-  'from-fuchsia-500 to-purple-500',
-  'from-cyan-500 to-blue-500',
-  'from-lime-500 to-emerald-500',
+/**
+ * Stable identity colour for a workspace or board, derived from its id. Flat, earthy tones that
+ * sit with the warm-neutral palette (no gradients, no blue/purple). All keep white initials
+ * readable at the sizes used (≥ 3:1).
+ */
+const SWATCHES = [
+  'bg-[oklch(0.58_0.14_40)]', // clay
+  'bg-[oklch(0.6_0.12_75)]', // ochre
+  'bg-[oklch(0.55_0.1_120)]', // olive
+  'bg-[oklch(0.55_0.07_155)]', // sage
+  'bg-[oklch(0.45_0.08_155)]', // forest
+  'bg-[oklch(0.55_0.13_15)]', // rose
+  'bg-[oklch(0.48_0.06_55)]', // walnut
+  'bg-[oklch(0.32_0.01_60)]', // charcoal
 ] as const;
 
 function hash(value: string): number {
@@ -16,8 +20,8 @@ function hash(value: string): number {
   return Math.abs(h);
 }
 
-export function gradientFor(id: string): string {
-  return GRADIENTS[hash(id) % GRADIENTS.length] ?? GRADIENTS[0];
+export function swatchFor(id: string): string {
+  return SWATCHES[hash(id) % SWATCHES.length] ?? SWATCHES[0];
 }
 
 export function initialOf(name: string): string {

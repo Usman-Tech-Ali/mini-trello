@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useBoard, useBoards } from '@/features/boards/hooks/use-boards';
 import { useWorkspaces } from '@/features/workspaces/hooks/use-workspaces';
-import { gradientFor, initialOf } from '@/lib/colors';
+import { initialOf, swatchFor } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 
 import { UserMenu } from './user-menu';
@@ -53,12 +53,7 @@ function WorkspaceBoards({ workspaceId }: { workspaceId: string }) {
         <SidebarMenuSubItem key={board.id}>
           <SidebarMenuSubButton asChild isActive={params.boardId === board.id}>
             <Link href={`/boards/${board.id}`}>
-              <span
-                className={cn(
-                  'size-2 shrink-0 rounded-full bg-linear-to-br',
-                  gradientFor(board.id),
-                )}
-              />
+              <span className={cn('size-2 shrink-0 rounded-full', swatchFor(board.id))} />
               <span className="truncate">{board.name}</span>
             </Link>
           </SidebarMenuSubButton>
@@ -80,7 +75,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg">
               <Link href="/workspaces">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
                   <SquareKanbanIcon className="size-4" aria-hidden="true" />
                 </span>
                 <span className="font-semibold">Mini Trello</span>
@@ -132,8 +127,8 @@ export function AppSidebar() {
                       <Link href={`/workspaces/${workspace.id}`}>
                         <span
                           className={cn(
-                            'flex size-5 shrink-0 items-center justify-center rounded bg-linear-to-br text-[10px] font-semibold text-white',
-                            gradientFor(workspace.id),
+                            'flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold text-white',
+                            swatchFor(workspace.id),
                           )}
                           aria-hidden="true"
                         >

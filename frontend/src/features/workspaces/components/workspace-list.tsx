@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/features/auth/hooks/use-session';
-import { gradientFor, initialOf } from '@/lib/colors';
+import { initialOf, swatchFor } from '@/lib/colors';
 import { formatDate } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -26,8 +26,8 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceDto }) {
       <div className="flex items-start justify-between gap-3">
         <span
           className={cn(
-            'flex size-11 items-center justify-center rounded-xl bg-linear-to-br text-lg font-semibold text-white shadow-sm',
-            gradientFor(workspace.id),
+            'flex size-11 items-center justify-center rounded-xl text-lg font-semibold text-white shadow-sm',
+            swatchFor(workspace.id),
           )}
           aria-hidden="true"
         >
@@ -38,7 +38,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceDto }) {
         </Badge>
       </div>
       <div className="min-w-0">
-        <p className="truncate font-semibold transition-colors group-hover:text-primary">
+        <p className="truncate font-semibold transition-colors group-hover:text-brand-text">
           {workspace.name}
         </p>
         <p className="text-sm text-muted-foreground">Created {formatDate(workspace.createdAt)}</p>
@@ -54,11 +54,11 @@ export function WorkspaceList() {
 
   return (
     <section className="flex flex-col gap-8" aria-labelledby="workspaces-heading">
-      <div className="rounded-2xl border bg-linear-to-br from-primary/10 via-accent/40 to-transparent p-6 sm:p-8">
-        <p className="text-sm font-medium text-primary">Welcome back, {firstName}</p>
+      <div className="border-b pb-6">
+        <p className="text-sm font-medium text-brand-text">Welcome back, {firstName}</p>
         <h1
           id="workspaces-heading"
-          className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl"
+          className="mt-1 font-display text-4xl tracking-tight sm:text-5xl"
         >
           Your workspaces
         </h1>
