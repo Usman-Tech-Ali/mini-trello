@@ -7,6 +7,31 @@ history. Every change appears instantly for everyone on the board.
 **Stack:** Next.js 16 · Express 5 · Socket.IO 4 · MongoDB 8 (Mongoose) · JWT in an httpOnly cookie ·
 TanStack Query · shadcn/ui + Tailwind CSS · zod · Vitest
 
+## Live demo
+
+**https://usman-mini-trello.vercel.app** · API: https://mini-trello-api.onrender.com/health
+
+- Register two accounts (for example in Chrome and in an incognito window) and add the second one to
+  your workspace by email to see real-time updates.
+- Runs on free tiers: the API sleeps after 15 idle minutes, so the **first request can take about a
+  minute**. Use Chrome, Edge or Firefox; Safari blocks the cross-site session cookie (see
+  [Deploy](#deploy-free-tiers)).
+
+## Contents
+
+- [Live demo](#live-demo)
+- [Run it](#run-it) · [Configuration](#configuration-backendenv) · [Deploy](#deploy-free-tiers)
+- [Architecture](#architecture)
+- [Data model](#data-model)
+- [API](#api)
+- [Real-time](#real-time)
+- [Concurrency and retries](#concurrency-and-retries)
+- [Security](#security)
+- [Tests](#tests)
+- [Requirements and choices](#requirements-and-choices)
+- [Limitations and how I'd finish them](#limitations-and-how-id-finish-them)
+- [Credits and AI assistance](#credits-and-ai-assistance)
+
 ## Run it
 
 ### Option 1 — Docker (one command)
