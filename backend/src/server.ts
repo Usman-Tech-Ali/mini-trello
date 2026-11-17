@@ -9,6 +9,7 @@ import {
   initModels,
 } from './db/connection';
 import { logger } from './lib/logger';
+import { createRealtimeServer } from './realtime/realtime-server';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -19,6 +20,7 @@ async function main(): Promise<void> {
   logger.info('Connected to MongoDB');
 
   const server = createServer(createApp());
+  const realtime = createRealtimeServer(server);
   // Promise-based so startup failures (e.g. port already in use) go through the fatal-log path below.
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -40,7 +42,8 @@ async function main(): Promise<void> {
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS).unref();
 
-    server.close(() => {
+    // Closes all sockets, then the HTTP server.
+    void realtime.close(() => {
       disconnectDatabase()
         .then(() => process.exit(0))
         .catch((error: unknown) => {
