@@ -2,6 +2,7 @@ import type { TaskListResponse, TaskResponse } from '@mini-trello/shared';
 import {
   createTaskSchema,
   moveTaskSchema,
+  restoreTaskSchema,
   taskFiltersSchema,
   updateTaskSchema,
 } from '@mini-trello/shared';
@@ -15,7 +16,15 @@ import {
 } from '../../lib/request-context';
 import { parseInput } from '../../lib/validate';
 import { emitActivity, emitNotifications, emitToBoard } from '../../realtime/realtime-server';
-import { createTask, deleteTask, getTask, listTasks, moveTask, updateTask } from './tasks.service';
+import {
+  createTask,
+  deleteTask,
+  getTask,
+  listTasks,
+  moveTask,
+  restoreTask,
+  updateTask,
+} from './tasks.service';
 
 // Broadcasts happen only after the service call resolved, i.e. after the write committed.
 
@@ -75,4 +84,17 @@ export async function remove(req: Request, res: Response): Promise<void> {
   emitToBoard(boardId, getOriginSocketId(req), 'task:deleted', { boardId, taskId });
   emitActivity(activities);
   res.status(204).end();
+}
+
+export async function restore(req: Request, res: Response<TaskResponse>): Promise<void> {
+  const input = parseInput(restoreTaskSchema, req.body);
+  const access = getTaskAccess(req);
+  const { task, activities, notifications } = await restoreTask(access, getAuthUserId(req), input);
+  emitToBoard(access.boardId, getOriginSocketId(req), 'task:updated', {
+    boardId: access.boardId,
+    task,
+  });
+  emitActivity(activities);
+  emitNotifications(notifications);
+  res.json({ task });
 }

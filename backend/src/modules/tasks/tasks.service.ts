@@ -2,6 +2,7 @@ import type {
   ActivityDto,
   ActivityTaskField,
   TaskDto,
+  RestoreTaskInput,
   TaskFilters,
   UpdateTaskInput,
 } from '@mini-trello/shared';
@@ -16,6 +17,8 @@ import { type NewActivity, recordActivities } from '../activity/activity.service
 import { type BoardAccess, type TaskAccess, TASK_NOT_FOUND } from '../boards/board-access';
 import { BoardModel } from '../boards/board.model';
 import { CommentModel } from '../comments/comment.model';
+import { findRevision, recordRevision } from '../history/history.service';
+import { TaskRevisionModel } from '../history/task-revision.model';
 import { createNotifications, type SentNotification } from '../notifications/notifications.service';
 import { MembershipModel } from '../workspaces/membership.model';
 import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from '@mini-trello/shared';
@@ -246,6 +249,7 @@ export async function createTask(
         });
       }
       const activities = await recordActivities(entries, session);
+      await recordRevision({ actorId: creatorId, action: 'created', after: task }, session);
       const notifications = await assignmentNotifications(
         access,
         creatorId,
@@ -265,10 +269,19 @@ export async function createTask(
 }
 
 /** Applies a partial update only if `version` still matches; otherwise 409 VERSION_CONFLICT. */
-export async function updateTask(
+export function updateTask(
   access: TaskAccess,
   actorId: string,
   input: UpdateTaskInput,
+): Promise<TaskChange> {
+  return applyUpdate(access, actorId, input, {});
+}
+
+async function applyUpdate(
+  access: TaskAccess,
+  actorId: string,
+  input: UpdateTaskInput,
+  options: { restoredFrom?: number },
 ): Promise<TaskChange> {
   const { version, dueDate, ...fields } = input;
   const changes: Record<string, unknown> = { ...fields };
@@ -289,6 +302,16 @@ export async function updateTask(
     if (!updated) return null;
     const activities = await recordActivities(
       describeUpdate(access, actorId, before, updated),
+      session,
+    );
+    await recordRevision(
+      {
+        actorId,
+        action: options.restoredFrom ? 'restored' : 'edited',
+        before,
+        after: updated,
+        restoredFrom: options.restoredFrom,
+      },
       session,
     );
     const newAssigneeId = updated.assigneeId?.toString() ?? null;
@@ -320,7 +343,6 @@ export async function moveTask(
     }
 
     const before = await TaskModel.findOne({ _id: access.taskId, version: input.version })
-      .select('columnId')
       .session(session)
       .lean();
     if (!before) return null;
@@ -369,6 +391,7 @@ export async function moveTask(
       });
     }
     const activities = await recordActivities(entries, session);
+    await recordRevision({ actorId, action: 'moved', before, after: updated }, session);
     return { task: toTaskDto(updated), activities, notifications: [] };
   });
   if (!result) throw await conflictOrNotFound(access.taskId);
@@ -381,9 +404,55 @@ export async function deleteTask(access: TaskAccess, actorId: string): Promise<A
     const task = await TaskModel.findOneAndDelete({ _id: access.taskId }, { session }).lean();
     if (!task) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
     await CommentModel.deleteMany({ taskId: access.taskId }, { session });
+    await TaskRevisionModel.deleteMany({ taskId: access.taskId }, { session });
     return recordActivities(
       [{ ...activityFor(access, actorId, task), action: 'task.deleted' }],
       session,
     );
   });
+}
+
+/**
+ * Brings back an earlier version's content as a new version (history is never rewritten). Goes
+ * through the same version-checked update as an edit, so restoring over someone else's newer
+ * change is a 409, and activity, notifications and broadcasts work as for any edit. The status
+ * (column) is not restored: moving a card is a workflow step, not content.
+ */
+export async function restoreTask(
+  access: TaskAccess,
+  actorId: string,
+  { version, toVersion }: RestoreTaskInput,
+): Promise<TaskChange> {
+  const target = await mongoose.connection.transaction(async (session) => {
+    const revision = await findRevision(access.taskId, toVersion, session);
+    if (!revision) return null;
+    // A former member can't be assigned again; restore the rest and leave it unassigned.
+    const assigneeId =
+      revision.snapshot.assigneeId &&
+      (await MembershipModel.exists({
+        workspaceId: access.workspaceId,
+        userId: revision.snapshot.assigneeId,
+      }).session(session))
+        ? revision.snapshot.assigneeId
+        : null;
+    return { ...revision.snapshot, assigneeId };
+  });
+  if (!target) throw new AppError(404, 'NOT_FOUND', 'That version of the task is not available.');
+
+  const current = await TaskModel.findById(access.taskId).lean();
+  if (!current) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
+  const changes: Omit<UpdateTaskInput, 'version'> = {};
+  if (current.title !== target.title) changes.title = target.title;
+  if (current.description !== target.description) changes.description = target.description;
+  if (current.priority !== target.priority) changes.priority = target.priority;
+  if ((current.assigneeId?.toString() ?? null) !== target.assigneeId) {
+    changes.assigneeId = target.assigneeId;
+  }
+  const currentDue = current.dueDate ? current.dueDate.toISOString().slice(0, 10) : null;
+  if (currentDue !== target.dueDate) changes.dueDate = target.dueDate;
+  if (Object.keys(changes).length === 0) {
+    if (current.version !== version) throw await conflictOrNotFound(access.taskId);
+    throw new AppError(400, 'NOTHING_TO_RESTORE', 'The task already matches that version.');
+  }
+  return applyUpdate(access, actorId, { version, ...changes }, { restoredFrom: toVersion });
 }
