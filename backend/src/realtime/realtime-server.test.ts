@@ -1,6 +1,13 @@
-import type { BoardResponse, TaskResponse, WorkspaceResponse } from '@mini-trello/shared';
+import type {
+  BoardResponse,
+  SocketTicketResponse,
+  TaskResponse,
+  WorkspaceResponse,
+} from '@mini-trello/shared';
+import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+import { TEST_ORIGIN } from '../test/http';
 import { startTestDatabase } from '../test/mongo-memory';
 import {
   connectSocket,
@@ -71,6 +78,37 @@ describe('handshake', () => {
     await expect(
       connectSocket(server.url, { cookie: 'mt_session=forged.token.value' }),
     ).rejects.toThrow('UNAUTHENTICATED');
+  });
+
+  it('accepts a socket ticket from POST /api/auth/socket-ticket instead of the cookie', async () => {
+    const res = await restAs(server.http, alice).post('/api/auth/socket-ticket').expect(200);
+    const { token } = res.body as SocketTicketResponse;
+    expect(res.headers['cache-control']).toBe('no-store');
+
+    const socket = await connectSocket(server.url, { ticket: token });
+    sockets.push(socket);
+    expect(await joinBoard(socket, boardId)).toMatchObject({ ok: true });
+  });
+
+  it('rejects forged tickets, and session tokens used as tickets (and the reverse)', async () => {
+    await expect(connectSocket(server.url, { ticket: 'forged.token.value' })).rejects.toThrow(
+      'UNAUTHENTICATED',
+    );
+    const sessionToken = alice.cookie.split('=')[1] ?? '';
+    await expect(connectSocket(server.url, { ticket: sessionToken })).rejects.toThrow(
+      'UNAUTHENTICATED',
+    );
+
+    const res = await restAs(server.http, alice).post('/api/auth/socket-ticket').expect(200);
+    const { token } = res.body as SocketTicketResponse;
+    await request(server.http).get('/api/auth/me').set('Cookie', `mt_session=${token}`).expect(401);
+  });
+
+  it('only issues tickets to signed-in users', async () => {
+    await request(server.http)
+      .post('/api/auth/socket-ticket')
+      .set('Origin', TEST_ORIGIN)
+      .expect(401);
   });
 
   it('rejects connections from origins that are not allowlisted', async () => {

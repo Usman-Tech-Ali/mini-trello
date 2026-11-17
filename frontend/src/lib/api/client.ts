@@ -52,7 +52,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   let response: Response;
   try {
-    response = await fetch(`${env.apiUrl}${path}`, {
+    response = await fetch(`${env.restBaseUrl}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
