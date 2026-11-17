@@ -8,5 +8,6 @@ export * from './errors';
 export * from './health';
 export * from './ordering';
 export * from './realtime';
+export * from './task-filters';
 export * from './tasks';
 export * from './workspaces';
