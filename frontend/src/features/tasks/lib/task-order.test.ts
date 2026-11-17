@@ -1,7 +1,7 @@
 import type { ColumnDto, TaskDto } from '@mini-trello/shared';
 import { describe, expect, it } from 'vitest';
 
-import { applyMove, groupTasksByColumn } from './task-order';
+import { applyMove, groupTasksByColumn, toColumnIndex } from './task-order';
 
 const columns: ColumnDto[] = [
   { id: 'todo', name: 'To do' },
@@ -54,5 +54,29 @@ describe('applyMove', () => {
   it('does not mutate the input', () => {
     applyMove(tasks, 'a', 'done', 0);
     expect(tasks[0]?.columnId).toBe('todo');
+  });
+});
+
+describe('toColumnIndex', () => {
+  // Column a b c d e; only b and d match the filters.
+  const column = ['a', 'b', 'c', 'd', 'e'].map((id, i) => task(id, 'todo', (i + 1) * 1024));
+  const visible = [column[1], column[3]].filter((t): t is TaskDto => !!t);
+
+  it('places a dropped task just before the visible card it was dropped above', () => {
+    expect(toColumnIndex(column, visible, 'x', 0)).toBe(1); // before b
+    expect(toColumnIndex(column, visible, 'x', 1)).toBe(3); // before d
+  });
+
+  it('places it just after the last visible card when dropped at the end', () => {
+    expect(toColumnIndex(column, visible, 'x', 2)).toBe(4); // after d, before hidden e
+  });
+
+  it('ignores the dragged task itself when it comes from the same column', () => {
+    // Dragging b below d: among a c d e, "after d" is index 3.
+    expect(toColumnIndex(column, visible, 'b', 1)).toBe(3);
+  });
+
+  it('appends when no card in the column is visible', () => {
+    expect(toColumnIndex(column, [], 'x', 0)).toBe(5);
   });
 });

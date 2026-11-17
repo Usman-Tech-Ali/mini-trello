@@ -47,7 +47,7 @@ export function BoardGrid({ workspaceId }: { workspaceId: string }) {
       {boardsQuery.isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading boards">
           {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+            <Skeleton key={i} className="h-32 rounded-lg" />
           ))}
         </div>
       ) : boardsQuery.isError ? (
@@ -75,7 +75,7 @@ export function BoardGrid({ workspaceId }: { workspaceId: string }) {
             <li key={board.id}>
               <Link
                 href={`/boards/${board.id}`}
-                className="group block overflow-hidden rounded-xl border bg-card shadow-xs transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="group block overflow-hidden rounded-lg border bg-card transition-colors outline-none hover:border-primary/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 {/* Miniature of the board's columns instead of a decorative banner. */}
                 <div className="flex h-20 gap-1.5 border-b bg-muted/60 p-3" aria-hidden="true">

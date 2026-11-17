@@ -91,6 +91,7 @@ export function TaskDialog({
   const moveTask = useMoveTask(board.id);
   const deleteTask = useDeleteTask(board.id);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [conflict, setConflict] = useState(false);
   const form = useForm<FormValues, unknown, z.output<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -118,6 +119,11 @@ export function TaskDialog({
   const close = () => {
     typingSignal.stop();
     onClose();
+  };
+  // Cancel, Escape, outside click or ×: unsaved edits are never thrown away silently.
+  const requestClose = () => {
+    if (form.formState.isDirty && !isSubmitting) setConfirmDiscard(true);
+    else close();
   };
 
   const save = form.handleSubmit(async (values) => {
@@ -176,8 +182,8 @@ export function TaskDialog({
 
   return (
     <>
-      <Dialog open onOpenChange={(open) => !open && close()}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <Dialog open onOpenChange={(open) => !open && requestClose()}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto overscroll-contain sm:max-w-2xl">
           <form onSubmit={(event) => void save(event)} noValidate>
             <DialogHeader>
               <DialogTitle>Edit task</DialogTitle>
@@ -209,6 +215,7 @@ export function TaskDialog({
                   <FieldLabel htmlFor="task-title">Title</FieldLabel>
                   <Input
                     id="task-title"
+                    autoComplete="off"
                     aria-invalid={!!errors.title}
                     aria-describedby={errors.title ? 'task-title-error' : undefined}
                     {...form.register('title', { onChange: typingSignal.onActivity })}
@@ -319,7 +326,7 @@ export function TaskDialog({
                 Delete
               </Button>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={close}>
+                <Button type="button" variant="outline" onClick={requestClose}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
@@ -341,6 +348,17 @@ export function TaskDialog({
         confirmLabel="Delete task"
         onConfirm={confirmDeletion}
         isPending={deleteTask.isPending}
+      />
+      <ConfirmDialog
+        open={confirmDiscard}
+        onOpenChange={setConfirmDiscard}
+        title="Discard your changes?"
+        description="Your edits to this task haven't been saved."
+        confirmLabel="Discard changes"
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          close();
+        }}
       />
     </>
   );

@@ -1,5 +1,10 @@
 import type { TaskListResponse, TaskResponse } from '@mini-trello/shared';
-import { createTaskSchema, moveTaskSchema, updateTaskSchema } from '@mini-trello/shared';
+import {
+  createTaskSchema,
+  moveTaskSchema,
+  taskFiltersSchema,
+  updateTaskSchema,
+} from '@mini-trello/shared';
 import type { Request, Response } from 'express';
 
 import {
@@ -15,7 +20,8 @@ import { createTask, deleteTask, getTask, listTasks, moveTask, updateTask } from
 // Broadcasts happen only after the service call resolved, i.e. after the write committed.
 
 export async function listForBoard(req: Request, res: Response<TaskListResponse>): Promise<void> {
-  res.json({ tasks: await listTasks(getBoardAccess(req).boardId) });
+  const filters = parseInput(taskFiltersSchema, req.query);
+  res.json({ tasks: await listTasks(getBoardAccess(req).boardId, filters) });
 }
 
 export async function create(req: Request, res: Response<TaskResponse>): Promise<void> {

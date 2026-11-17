@@ -2,6 +2,7 @@
 
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import type { BoardDto, MemberDto } from '@mini-trello/shared';
+import { hasActiveFilters, matchesTaskFilters } from '@mini-trello/shared';
 import { createBoardSchema, createColumnSchema } from '@mini-trello/shared';
 import {
   EllipsisIcon,
@@ -35,13 +36,15 @@ import { useBoardChannel } from '@/features/realtime/hooks/use-board-channel';
 import { typingUsers } from '@/features/realtime/lib/remote-updates';
 import { TaskDialog } from '@/features/tasks/components/task-dialog';
 import { useBoardTasks, useMoveTask } from '@/features/tasks/hooks/use-tasks';
-import { groupTasksByColumn } from '@/features/tasks/lib/task-order';
+import { groupTasksByColumn, toColumnIndex } from '@/features/tasks/lib/task-order';
 import { useWorkspace, useWorkspaceMembers } from '@/features/workspaces/hooks/use-workspaces';
 import { ApiError } from '@/lib/api/api-error';
 import { initialOf, swatchFor } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 
 import { useBoard, useCreateColumn, useDeleteBoard, useRenameBoard } from '../hooks/use-boards';
+import { useTaskFilters } from '../hooks/use-task-filters';
+import { BoardFilters } from './board-filters';
 import { BoardColumn } from './board-column';
 
 function BoardSkeleton() {
@@ -50,7 +53,7 @@ function BoardSkeleton() {
       <Skeleton className="h-9 w-64" />
       <div className="flex gap-4 overflow-hidden">
         {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-96 w-72 shrink-0 rounded-xl" />
+          <Skeleton key={i} className="h-96 w-72 shrink-0 rounded-lg" />
         ))}
       </div>
     </div>
@@ -94,6 +97,8 @@ function Board({ board }: { board: BoardDto }) {
   const [pendingTaskIds, setPendingTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<'rename' | 'add-column' | 'delete' | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const { filters, setFilters, clearFilters } = useTaskFilters();
+  const isFiltered = hasActiveFilters(filters);
   const currentUser = useCurrentUser();
   const { onlineUserIds, typing } = useBoardChannel(board, {
     onTaskDeleted: (taskId) => {
@@ -113,6 +118,18 @@ function Board({ board }: { board: BoardDto }) {
     () => groupTasksByColumn(board.columns, tasksQuery.data ?? []),
     [board.columns, tasksQuery.data],
   );
+  const visibleTasks = useMemo(
+    () => (tasksQuery.data ?? []).filter((task) => matchesTaskFilters(task, filters)),
+    [tasksQuery.data, filters],
+  );
+  const visibleByColumn = useMemo(
+    () => groupTasksByColumn(board.columns, visibleTasks),
+    [board.columns, visibleTasks],
+  );
+  // The status filter narrows the board to a single column.
+  const shownColumns = filters.column
+    ? board.columns.filter((column) => column.id === filters.column)
+    : board.columns;
   const columnSizes = useMemo(
     () => new Map([...tasksByColumn].map(([id, tasks]) => [id, tasks.length])),
     [tasksByColumn],
@@ -142,9 +159,20 @@ function Board({ board }: { board: BoardDto }) {
     const task = tasksQuery.data?.find((t) => t.id === draggableId);
     if (!task) return;
 
+    // While filtering, the drop index counts only visible cards; the API needs the full position.
+    const columnId = destination.droppableId;
+    const index = isFiltered
+      ? toColumnIndex(
+          tasksByColumn.get(columnId) ?? [],
+          visibleByColumn.get(columnId) ?? [],
+          task.id,
+          destination.index,
+        )
+      : destination.index;
+
     setPendingTaskIds((ids) => new Set(ids).add(task.id));
     moveTask.mutate(
-      { task, columnId: destination.droppableId, index: destination.index },
+      { task, columnId, index },
       {
         onError: (error) => {
           toast.error(
@@ -178,10 +206,11 @@ function Board({ board }: { board: BoardDto }) {
             {initialOf(board.name)}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate font-display text-3xl tracking-tight">{board.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {tasksQuery.data ? `${tasksQuery.data.length} tasks` : 'Loading tasks…'} ·{' '}
-              {board.columns.length} columns
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+              {board.name}
+            </h1>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {board.columns.length === 1 ? '1 column' : `${board.columns.length} columns`}
             </p>
           </div>
         </div>
@@ -224,6 +253,19 @@ function Board({ board }: { board: BoardDto }) {
         </div>
       </div>
 
+      {tasksQuery.data && (
+        <BoardFilters
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          members={members}
+          columns={board.columns}
+          currentUserId={currentUser.id}
+          shownCount={visibleTasks.length}
+          totalCount={tasksQuery.data.length}
+        />
+      )}
+
       {tasksQuery.isError ? (
         <ErrorState
           title="Could not load tasks"
@@ -234,26 +276,30 @@ function Board({ board }: { board: BoardDto }) {
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="-mx-4 flex min-h-0 flex-1 items-start gap-4 overflow-x-auto px-4 pb-4">
-            {board.columns.map((column) => (
+            {shownColumns.map((column) => (
               <BoardColumn
                 key={column.id}
                 boardId={board.id}
                 column={column}
-                tasks={tasksByColumn.get(column.id) ?? []}
+                tasks={visibleByColumn.get(column.id) ?? []}
+                totalCount={tasksByColumn.get(column.id)?.length ?? 0}
+                isFiltered={isFiltered}
                 membersById={membersById}
                 pendingTaskIds={pendingTaskIds}
                 editorsByTask={editorsByTask}
                 onOpenTask={setOpenTaskId}
               />
             ))}
-            <button
-              type="button"
-              onClick={() => setDialog('add-column')}
-              className="flex h-24 w-72 shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <PlusIcon className="size-4" aria-hidden="true" />
-              Add column
-            </button>
+            {!filters.column && (
+              <button
+                type="button"
+                onClick={() => setDialog('add-column')}
+                className="flex h-24 w-72 shrink-0 items-center justify-center gap-2 rounded-lg border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <PlusIcon className="size-4" aria-hidden="true" />
+                Add column
+              </button>
+            )}
           </div>
         </DragDropContext>
       )}

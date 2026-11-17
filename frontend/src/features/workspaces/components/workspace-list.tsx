@@ -21,12 +21,12 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceDto }) {
   return (
     <Link
       href={`/workspaces/${workspace.id}`}
-      className="group flex h-full flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="group flex h-full flex-col gap-4 rounded-lg border bg-card p-5 transition-colors outline-none hover:border-primary/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <div className="flex items-start justify-between gap-3">
         <span
           className={cn(
-            'flex size-11 items-center justify-center rounded-xl text-lg font-semibold text-white shadow-sm',
+            'flex size-11 items-center justify-center rounded-lg text-lg font-semibold text-white',
             swatchFor(workspace.id),
           )}
           aria-hidden="true"
@@ -58,7 +58,7 @@ export function WorkspaceList() {
         <p className="text-sm font-medium text-brand-text">Welcome back, {firstName}</p>
         <h1
           id="workspaces-heading"
-          className="mt-1 font-display text-4xl tracking-tight sm:text-5xl"
+          className="mt-1 text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
         >
           Your workspaces
         </h1>
@@ -70,7 +70,7 @@ export function WorkspaceList() {
       {isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading workspaces">
           {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
+            <Skeleton key={i} className="h-36 rounded-lg" />
           ))}
         </div>
       ) : isError ? (
@@ -108,7 +108,7 @@ export function WorkspaceList() {
               trigger={
                 <button
                   type="button"
-                  className="flex h-full min-h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="flex h-full min-h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <PlusIcon className="size-5" aria-hidden="true" />
                   New workspace

@@ -15,5 +15,8 @@ export default defineConfig({
     },
     // The first run downloads a MongoDB binary for mongodb-memory-server.
     hookTimeout: 180_000,
+    // Integration tests hash passwords (argon2, deliberately CPU-heavy) and run transactions;
+    // on a busy machine or CI runner the 5 s default caused rare false timeouts.
+    testTimeout: 20_000,
   },
 });

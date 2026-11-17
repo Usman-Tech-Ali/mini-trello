@@ -1,4 +1,11 @@
-import type { ActivityDto, ActivityTaskField, TaskDto, UpdateTaskInput } from '@mini-trello/shared';
+import type {
+  ActivityDto,
+  ActivityTaskField,
+  TaskDto,
+  TaskFilters,
+  UpdateTaskInput,
+} from '@mini-trello/shared';
+import { UNASSIGNED } from '@mini-trello/shared';
 import type { createTaskSchema, moveTaskSchema } from '@mini-trello/shared';
 import mongoose, { type ClientSession, type Types } from 'mongoose';
 import type { z } from 'zod';
@@ -140,8 +147,22 @@ function describeUpdate(
   return entries;
 }
 
-export async function listTasks(boardId: string): Promise<TaskDto[]> {
-  const tasks = await TaskModel.find({ boardId }).sort({ position: 1 }).lean();
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A board's tasks in display order, optionally filtered (filters combine with AND). Every query
+ * is scoped to one board, so it starts from the { boardId, columnId, position } index and only
+ * scans that board's tasks; a title regex can't use an index anyway, and a text index would not
+ * match partial words ("log" in "login").
+ */
+export async function listTasks(boardId: string, filters: TaskFilters = {}): Promise<TaskDto[]> {
+  const query: Record<string, unknown> = { boardId };
+  if (filters.q) query.title = { $regex: escapeRegExp(filters.q), $options: 'i' };
+  if (filters.assignee)
+    query.assigneeId = filters.assignee === UNASSIGNED ? null : filters.assignee;
+  if (filters.priority) query.priority = filters.priority;
+  if (filters.column) query.columnId = filters.column;
+  const tasks = await TaskModel.find(query).sort({ position: 1 }).lean();
   return tasks.map(toTaskDto);
 }
 
