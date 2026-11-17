@@ -4,8 +4,8 @@ import type {
   ActivityDto,
   ActivityListResponse,
 } from '@mini-trello/shared';
-import type { activityListQuerySchema } from '@mini-trello/shared';
-import type { ClientSession, Types } from 'mongoose';
+import type { ActivityFilters, activityListQuerySchema } from '@mini-trello/shared';
+import { type ClientSession, Types } from 'mongoose';
 import type { z } from 'zod';
 
 import { ActivityModel } from './activity.model';
@@ -60,12 +60,34 @@ export async function recordActivities(
   return created.map((doc) => toActivityDto(doc));
 }
 
+/**
+ * ObjectIds start with their creation time in seconds, so a time range becomes an `_id` range
+ * and is served by the same { boardId, _id } index as paging, with no separate date index.
+ */
+function idAtTime(iso: string, roundUp: boolean): Types.ObjectId {
+  const seconds = new Date(iso).getTime() / 1000;
+  return Types.ObjectId.createFromTime(roundUp ? Math.ceil(seconds) : Math.floor(seconds));
+}
+
 export async function listActivity(
   boardId: string,
   { cursor, limit }: ListQuery,
+  filters: ActivityFilters = {},
 ): Promise<ActivityListResponse> {
   const filter: Record<string, unknown> = { boardId };
-  if (cursor) filter._id = { $lt: cursor };
+  if (filters.actor) filter.actorId = filters.actor;
+  if (filters.action) filter.action = filters.action;
+  const idRange: Record<string, Types.ObjectId> = {};
+  // `from` inclusive: the smallest id of that second. `to` exclusive: below the first id of the
+  // second at (or after) `to`.
+  if (filters.from) idRange.$gte = idAtTime(filters.from, false);
+  if (filters.to) idRange.$lt = idAtTime(filters.to, true);
+  if (cursor) {
+    const cursorId = new Types.ObjectId(cursor);
+    // Same-length hex strings compare in id (= time) order.
+    if (!idRange.$lt || cursorId.toHexString() < idRange.$lt.toHexString()) idRange.$lt = cursorId;
+  }
+  if (Object.keys(idRange).length > 0) filter._id = idRange;
   // One extra row tells us whether another page exists, without a count query.
   const rows = await ActivityModel.find(filter)
     .sort({ _id: -1 })
