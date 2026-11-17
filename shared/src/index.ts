@@ -6,6 +6,7 @@ export * from './common';
 export * from './dev';
 export * from './errors';
 export * from './health';
+export * from './notifications';
 export * from './ordering';
 export * from './realtime';
 export * from './task-filters';

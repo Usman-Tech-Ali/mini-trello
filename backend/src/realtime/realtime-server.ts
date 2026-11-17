@@ -3,6 +3,7 @@ import type { Server as HttpServer } from 'node:http';
 import type {
   ActivityDto,
   ClientToServerEvents,
+  NotificationDto,
   ErrorCode,
   ServerToClientEvents,
   SocketFailure,
@@ -206,6 +207,13 @@ export function emitToUser<E extends keyof ServerToClientEvents>(
   ...args: Parameters<ServerToClientEvents[E]>
 ): void {
   io?.to(userRoom(userId)).emit(event, ...args);
+}
+
+/** Delivers each notification to its recipient's open tabs (after the write committed). */
+export function emitNotifications(sent: { userId: string; notification: NotificationDto }[]): void {
+  for (const { userId, notification } of sent) {
+    emitToUser(userId, 'notification:created', { notification });
+  }
 }
 
 /** The board was deleted: tell everyone on it and empty the room. */

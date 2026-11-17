@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ActivityDto } from './activity';
 import type { BoardDto } from './boards';
 import type { CommentDto } from './comments';
+import type { NotificationDto } from './notifications';
 import { objectIdSchema } from './common';
 import type { ErrorCode } from './errors';
 import type { TaskDto } from './tasks';
@@ -51,6 +52,10 @@ export interface ServerToClientEvents {
    * their role changed. Their workspace list and permissions must be reloaded.
    */
   'workspaces:changed': (payload: { workspaceId: string }) => void;
+  /** Sent to the recipient's personal room only. */
+  'notification:created': (payload: { notification: NotificationDto }) => void;
+  /** Notifications were marked read (possibly in another tab): reload the list and count. */
+  'notifications:changed': () => void;
   'presence:update': (payload: { boardId: string; userIds: string[] }) => void;
   'typing:update': (payload: {
     boardId: string;

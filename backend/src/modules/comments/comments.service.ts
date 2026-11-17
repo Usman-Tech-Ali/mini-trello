@@ -1,13 +1,16 @@
 import type { ActivityDto, CommentDto, CommentListResponse } from '@mini-trello/shared';
 import type { commentListQuerySchema, createCommentSchema } from '@mini-trello/shared';
-import mongoose, { type Types } from 'mongoose';
+import mongoose, { type ClientSession, type Types } from 'mongoose';
 import type { z } from 'zod';
 
 import { AppError } from '../../lib/app-error';
 import { isDuplicateKeyError } from '../../lib/mongo-errors';
 import { recordActivities } from '../activity/activity.service';
 import { type TaskAccess, TASK_NOT_FOUND } from '../boards/board-access';
+import { createNotifications, type SentNotification } from '../notifications/notifications.service';
 import { TaskModel } from '../tasks/task.model';
+import { UserModel } from '../users/user.model';
+import { MembershipModel } from '../workspaces/membership.model';
 import { CommentModel } from './comment.model';
 
 type CreateCommentData = z.output<typeof createCommentSchema>;
@@ -21,6 +24,7 @@ interface CommentShape {
   boardId: Types.ObjectId;
   authorId: Types.ObjectId;
   body: string;
+  mentionIds?: Types.ObjectId[];
   createdAt: Date;
 }
 
@@ -31,12 +35,40 @@ export function toCommentDto(comment: CommentShape): CommentDto {
     boardId: comment.boardId.toString(),
     authorId: comment.authorId.toString(),
     body: comment.body,
+    mentionIds: (comment.mentionIds ?? []).map((id) => id.toString()),
     createdAt: comment.createdAt.toISOString(),
   };
 }
 
 function excerptOf(body: string): string {
   return body.length > EXCERPT_LENGTH ? `${body.slice(0, EXCERPT_LENGTH - 1)}…` : body;
+}
+
+/**
+ * The client says who was picked from the @mention list; the server decides who really counts:
+ * only current members of the workspace, other than the author, whose "@Name" is in the body.
+ */
+async function resolveMentions(
+  workspaceId: string,
+  authorId: string,
+  body: string,
+  candidateIds: string[],
+  session: ClientSession,
+): Promise<string[]> {
+  const ids = [...new Set(candidateIds)].filter((id) => id !== authorId);
+  if (ids.length === 0) return [];
+  const members = await MembershipModel.find({ workspaceId, userId: { $in: ids } })
+    .select('userId')
+    .session(session)
+    .lean();
+  const users = await UserModel.find({ _id: { $in: members.map((m) => m.userId) } })
+    .select('name')
+    .session(session)
+    .lean();
+  const mentioned = new Set(
+    users.filter((user) => body.includes(`@${user.name}`)).map((user) => user._id.toString()),
+  );
+  return ids.filter((id) => mentioned.has(id));
 }
 
 /** Newest page first, each page oldest → newest, so the UI can prepend "earlier" pages. */
@@ -61,12 +93,24 @@ export async function createComment(
   access: TaskAccess,
   authorId: string,
   input: CreateCommentData,
-): Promise<{ comment: CommentDto; activity: ActivityDto | null; created: boolean }> {
+): Promise<{
+  comment: CommentDto;
+  activity: ActivityDto | null;
+  notifications: SentNotification[];
+  created: boolean;
+}> {
   try {
     return await mongoose.connection.transaction(async (session) => {
       // Read in the transaction: a task deleted concurrently can't end up with an orphan comment.
       const task = await TaskModel.findById(access.taskId).select('title').session(session).lean();
       if (!task) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
+      const mentionIds = await resolveMentions(
+        access.workspaceId,
+        authorId,
+        input.body,
+        input.mentionIds,
+        session,
+      );
 
       const [comment] = await CommentModel.create(
         [
@@ -75,6 +119,7 @@ export async function createComment(
             boardId: access.boardId,
             authorId,
             body: input.body,
+            mentionIds,
             requestId: input.requestId,
           },
         ],
@@ -96,13 +141,31 @@ export async function createComment(
         ],
         session,
       );
-      return { comment: toCommentDto(comment), activity: activity ?? null, created: true };
+      const notifications = await createNotifications(
+        mentionIds.map((userId) => ({
+          userId,
+          type: 'comment.mentioned' as const,
+          actorId: authorId,
+          workspaceId: access.workspaceId,
+          boardId: access.boardId,
+          taskId: access.taskId,
+          taskTitle: task.title,
+          excerpt: excerptOf(input.body),
+        })),
+        session,
+      );
+      return {
+        comment: toCommentDto(comment),
+        activity: activity ?? null,
+        notifications,
+        created: true,
+      };
     });
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
     // A retry of a request that already succeeded: return the original comment.
     const existing = await CommentModel.findOne({ authorId, requestId: input.requestId }).lean();
     if (existing?.taskId.toString() !== access.taskId) throw error;
-    return { comment: toCommentDto(existing), activity: null, created: false };
+    return { comment: toCommentDto(existing), activity: null, notifications: [], created: false };
   }
 }
