@@ -221,3 +221,41 @@ describe('comment and activity broadcasts', () => {
     expect(await broadcast).toBe(false);
   });
 });
+
+describe('personal workspace events', () => {
+  it('tells a user, on every open tab, when they are added, re-roled or removed', async () => {
+    const carol = await registerSessionUser(server.http, 'Carol');
+    const [tab1, tab2] = await Promise.all([
+      connectSocket(server.url, { cookie: carol.cookie }),
+      connectSocket(server.url, { cookie: carol.cookie }),
+    ]);
+    const api = restAs(server.http, alice);
+    try {
+      const added = Promise.all([
+        nextEvent(tab1, 'workspaces:changed'),
+        nextEvent(tab2, 'workspaces:changed'),
+      ]);
+      const bobHears = receives(bobSocket, 'workspaces:changed');
+      await api
+        .post(`/api/workspaces/${workspaceId}/members`)
+        .send({ email: carol.user.email })
+        .expect(201);
+      expect(await added).toEqual([{ workspaceId }, { workspaceId }]);
+      expect(await bobHears).toBe(false);
+
+      const promoted = nextEvent(tab1, 'workspaces:changed');
+      await api
+        .patch(`/api/workspaces/${workspaceId}/members/${carol.user.id}`)
+        .send({ role: 'admin' })
+        .expect(200);
+      expect(await promoted).toEqual({ workspaceId });
+
+      const removed = nextEvent(tab1, 'workspaces:changed');
+      await api.delete(`/api/workspaces/${workspaceId}/members/${carol.user.id}`).expect(204);
+      expect(await removed).toEqual({ workspaceId });
+    } finally {
+      tab1.close();
+      tab2.close();
+    }
+  });
+});

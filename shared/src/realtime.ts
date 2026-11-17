@@ -46,6 +46,11 @@ export interface ServerToClientEvents {
   'comment:created': (payload: { boardId: string; comment: CommentDto }) => void;
   /** Sent to everyone on the board, including the user who caused it. */
   'activity:created': (payload: { boardId: string; activity: ActivityDto }) => void;
+  /**
+   * Sent to one user (their personal room): they were added to or removed from a workspace, or
+   * their role changed. Their workspace list and permissions must be reloaded.
+   */
+  'workspaces:changed': (payload: { workspaceId: string }) => void;
   'presence:update': (payload: { boardId: string; userIds: string[] }) => void;
   'typing:update': (payload: {
     boardId: string;

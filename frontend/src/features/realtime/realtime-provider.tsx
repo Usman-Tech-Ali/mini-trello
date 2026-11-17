@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { setSession } from '@/features/auth/hooks/use-session';
+import { workspaceKeys } from '@/features/workspaces/api/workspaces.keys';
 import { getSocket } from '@/lib/realtime/socket';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
@@ -47,12 +48,19 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       else setStatus(socket.active ? 'reconnecting' : 'offline');
     };
 
+    // Added to / removed from a workspace, or role changed: reload workspaces (sidebar, lists, roles).
+    const onWorkspacesChanged = () => {
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+    };
+
     socket.on('connect', onConnect);
+    socket.on('workspaces:changed', onWorkspacesChanged);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
     socket.connect();
     return () => {
       socket.off('connect', onConnect);
+      socket.off('workspaces:changed', onWorkspacesChanged);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
       socket.disconnect();

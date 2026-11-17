@@ -48,6 +48,8 @@ const presence = new PresenceTracker();
 let io: RealtimeServer | null = null;
 
 const boardRoom = (boardId: string) => `board:${boardId}`;
+/** Every socket of a user, for events about them personally (not about a board). */
+const userRoom = (userId: string) => `user:${userId}`;
 
 function errorAck(error: unknown): SocketFailure {
   if (error instanceof AppError) {
@@ -174,7 +176,11 @@ export function createRealtimeServer(httpServer: HttpServer): RealtimeServer {
     });
   });
 
-  server.on('connection', registerHandlers);
+  server.on('connection', (socket) => {
+    // Derived from the verified session, never from client input.
+    void socket.join(userRoom(socket.data.userId));
+    registerHandlers(socket);
+  });
   io = server;
   return server;
 }
@@ -192,6 +198,14 @@ export function emitToBoard<E extends keyof ServerToClientEvents>(
     ? io.to(boardRoom(boardId)).except(exceptSocketId)
     : io.to(boardRoom(boardId));
   target.emit(event, ...args);
+}
+
+export function emitToUser<E extends keyof ServerToClientEvents>(
+  userId: string,
+  event: E,
+  ...args: Parameters<ServerToClientEvents[E]>
+): void {
+  io?.to(userRoom(userId)).emit(event, ...args);
 }
 
 /** The board was deleted: tell everyone on it and empty the room. */
