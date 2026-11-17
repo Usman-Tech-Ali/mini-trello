@@ -79,6 +79,16 @@ describe('posting comments', () => {
     expect(await CommentModel.countDocuments({ taskId: task.id })).toBe(1);
   });
 
+  it('limits how fast one person can post comments', async () => {
+    const chatty = await registerUser(app, 'Chatty');
+    await addMember(admin, workspace.id, chatty);
+    for (let i = 0; i < 30; i += 1) await postComment(chatty, `Comment ${i}`).expect(201);
+    const res = await postComment(chatty, 'One too many').expect(429);
+    expect((res.body as ApiErrorResponse).error.code).toBe('RATE_LIMITED');
+    // Other people are not affected.
+    await postComment(member, 'Still fine').expect(201);
+  });
+
   it('hides tasks from non-members', async () => {
     await postComment(outsider, 'Let me in').expect(404);
     await outsider.client.get(`/api/tasks/${task.id}/comments`).expect(404);

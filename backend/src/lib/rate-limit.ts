@@ -31,3 +31,27 @@ export function createAuthRateLimiter({
     },
   });
 }
+
+/**
+ * Per-user limit for write routes that fan out to other people (comments with @mentions create
+ * notifications). Keyed by the signed-in user, so people behind one office IP don't share it.
+ * Use after `requireAuth`.
+ */
+export function createUserRateLimiter({ limit, windowMs }: { limit: number; windowMs: number }) {
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator: (req) => `user:${req.auth?.userId ?? 'anonymous'}`,
+    handler: (_req, _res, next) => {
+      next(
+        new AppError(
+          429,
+          'RATE_LIMITED',
+          'You are doing that too often. Please slow down a little.',
+        ),
+      );
+    },
+  });
+}
