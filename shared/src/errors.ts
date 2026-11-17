@@ -19,6 +19,7 @@ export const errorCodeSchema = z.enum([
   'LAST_ADMIN',
   'VERSION_CONFLICT',
   'COLUMN_NOT_EMPTY',
+  'NOTHING_TO_RESTORE',
 ]);
 
 export type ErrorCode = z.infer<typeof errorCodeSchema>;

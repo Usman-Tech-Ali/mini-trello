@@ -8,6 +8,7 @@ import mongoose, { type ClientSession } from 'mongoose';
 
 import { AppError } from '../../lib/app-error';
 import { isDuplicateKeyError } from '../../lib/mongo-errors';
+import { recordRevision } from '../history/history.service';
 import { TaskModel } from '../tasks/task.model';
 import { UserModel } from '../users/user.model';
 import { MembershipModel, type MembershipDocument } from './membership.model';
@@ -200,11 +201,26 @@ export async function removeMember(
     const target = await getTargetMembership(workspaceId, targetUserId, session);
     if (target.role === 'admin') await decrementAdminCount(workspaceId, session);
     await MembershipModel.deleteOne({ _id: target._id }, { session });
-    // Former members can't stay assigned to tasks they can no longer see.
+    // Former members can't stay assigned to tasks they can no longer see. Each unassignment is
+    // a new task version, so it gets a history entry like any other edit.
+    const assigned = await TaskModel.find({ workspaceId, assigneeId: targetUserId })
+      .session(session)
+      .lean();
     await TaskModel.updateMany(
       { workspaceId, assigneeId: targetUserId },
       { $set: { assigneeId: null }, $inc: { version: 1 } },
       { session },
     );
+    for (const before of assigned) {
+      await recordRevision(
+        {
+          actorId: actorUserId,
+          action: 'edited',
+          before,
+          after: { ...before, assigneeId: null, version: before.version + 1 },
+        },
+        session,
+      );
+    }
   });
 }
