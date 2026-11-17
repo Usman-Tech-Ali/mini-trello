@@ -1,5 +1,7 @@
+export * from './activity';
 export * from './auth';
 export * from './boards';
+export * from './comments';
 export * from './common';
 export * from './dev';
 export * from './errors';

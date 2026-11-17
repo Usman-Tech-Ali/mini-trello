@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
+import type { ActivityDto } from './activity';
 import type { BoardDto } from './boards';
+import type { CommentDto } from './comments';
 import { objectIdSchema } from './common';
 import type { ErrorCode } from './errors';
 import type { TaskDto } from './tasks';
@@ -40,6 +42,10 @@ export interface ServerToClientEvents {
   'board:stale': (payload: { boardId: string }) => void;
   /** The user lost access (removed from the workspace) and has been taken out of the room. */
   'board:access-revoked': (payload: { boardId: string }) => void;
+  /** A new comment on one of the board's tasks. */
+  'comment:created': (payload: { boardId: string; comment: CommentDto }) => void;
+  /** Sent to everyone on the board, including the user who caused it. */
+  'activity:created': (payload: { boardId: string; activity: ActivityDto }) => void;
   'presence:update': (payload: { boardId: string; userIds: string[] }) => void;
   'typing:update': (payload: {
     boardId: string;
