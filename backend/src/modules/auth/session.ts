@@ -21,18 +21,29 @@ export function signSessionToken(userId: string): Promise<string> {
     .sign(secret);
 }
 
-/** Returns the user id for a valid, unexpired token, or null for anything else. */
-export async function verifySessionToken(token: string): Promise<string | null> {
+export interface VerifiedSession {
+  userId: string;
+  /** Unix time (seconds) when the session expires. */
+  expiresAt: number;
+}
+
+/** Returns the session for a valid, unexpired token, or null for anything else. */
+export async function verifySession(token: string): Promise<VerifiedSession | null> {
   try {
     const { payload } = await jwtVerify(token, secret, {
       issuer: ISSUER,
       audience: AUDIENCE,
       algorithms: ['HS256'],
     });
-    return payload.sub ?? null;
+    if (!payload.sub || payload.exp === undefined) return null;
+    return { userId: payload.sub, expiresAt: payload.exp };
   } catch {
     return null;
   }
+}
+
+export async function verifySessionToken(token: string): Promise<string | null> {
+  return (await verifySession(token))?.userId ?? null;
 }
 
 export function sessionCookieOptions(): CookieOptions {

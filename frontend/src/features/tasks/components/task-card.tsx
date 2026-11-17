@@ -1,7 +1,8 @@
 import type { MemberDto, TaskDto } from '@mini-trello/shared';
-import { AlignLeftIcon, CalendarIcon } from 'lucide-react';
+import { AlignLeftIcon, CalendarIcon, PencilLineIcon } from 'lucide-react';
 
 import { UserAvatar } from '@/components/user-avatar';
+import { describeEditors } from '@/features/realtime/lib/remote-updates';
 import { dueStatus, formatDueDate } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -17,9 +18,11 @@ interface TaskCardProps {
   task: TaskDto;
   assignee: MemberDto | undefined;
   isDragging?: boolean;
+  /** Names of other people editing this task right now. */
+  editors?: string[];
 }
 
-export function TaskCard({ task, assignee, isDragging = false }: TaskCardProps) {
+export function TaskCard({ task, assignee, isDragging = false, editors = [] }: TaskCardProps) {
   const status = task.dueDate ? dueStatus(task.dueDate) : null;
   return (
     <div
@@ -61,6 +64,15 @@ export function TaskCard({ task, assignee, isDragging = false }: TaskCardProps) 
             </span>
           )}
         </div>
+      )}
+      {editors.length > 0 && (
+        <p
+          className="flex items-center gap-1 text-xs font-medium text-brand-text"
+          aria-live="polite"
+        >
+          <PencilLineIcon className="size-3 animate-pulse" aria-hidden="true" />
+          {describeEditors(editors)}…
+        </p>
       )}
     </div>
   );
