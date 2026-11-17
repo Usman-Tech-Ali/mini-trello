@@ -10,6 +10,7 @@ function comment(id: string): CommentDto {
     boardId: 'b1',
     authorId: 'u1',
     body: `comment ${id}`,
+    mentionIds: [],
     createdAt: '2026-11-17T10:00:00.000Z',
   };
 }

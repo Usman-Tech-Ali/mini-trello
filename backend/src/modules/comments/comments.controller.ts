@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 
 import { getAuthUserId, getOriginSocketId, getTaskAccess } from '../../lib/request-context';
 import { parseInput } from '../../lib/validate';
-import { emitActivity, emitToBoard } from '../../realtime/realtime-server';
+import { emitActivity, emitNotifications, emitToBoard } from '../../realtime/realtime-server';
 import { createComment, listComments } from './comments.service';
 
 export async function listForTask(req: Request, res: Response<CommentListResponse>): Promise<void> {
@@ -15,7 +15,11 @@ export async function listForTask(req: Request, res: Response<CommentListRespons
 export async function create(req: Request, res: Response<CommentResponse>): Promise<void> {
   const input = parseInput(createCommentSchema, req.body);
   const access = getTaskAccess(req);
-  const { comment, activity, created } = await createComment(access, getAuthUserId(req), input);
+  const { comment, activity, notifications, created } = await createComment(
+    access,
+    getAuthUserId(req),
+    input,
+  );
   // Only after the transaction committed; a deduplicated retry has nothing new to announce.
   if (created) {
     emitToBoard(access.boardId, getOriginSocketId(req), 'comment:created', {
@@ -24,5 +28,6 @@ export async function create(req: Request, res: Response<CommentResponse>): Prom
     });
   }
   if (activity) emitActivity([activity]);
+  emitNotifications(notifications);
   res.status(created ? 201 : 200).json({ comment });
 }

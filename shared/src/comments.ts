@@ -8,8 +8,19 @@ export const commentBodySchema = z
   .min(1, 'Write something first')
   .max(2000, 'Comment must be at most 2000 characters');
 
+/** At most this many people can be @mentioned in one comment. */
+export const MAX_MENTIONS = 20;
+
 export const createCommentSchema = z.object({
   body: commentBodySchema,
+  /**
+   * Members picked from the @mention list. The server keeps only workspace members whose
+   * "@Name" is still in the body, and never notifies the author.
+   */
+  mentionIds: z
+    .array(objectIdSchema)
+    .max(MAX_MENTIONS, `You can mention at most ${MAX_MENTIONS} people`)
+    .default([]),
   requestId: requestIdSchema,
 });
 export type CreateCommentInput = z.input<typeof createCommentSchema>;
@@ -27,6 +38,8 @@ export interface CommentDto {
   boardId: string;
   authorId: string;
   body: string;
+  /** Members mentioned with "@Name" in the body. */
+  mentionIds: string[];
   createdAt: string;
 }
 

@@ -16,6 +16,7 @@ import { type NewActivity, recordActivities } from '../activity/activity.service
 import { type BoardAccess, type TaskAccess, TASK_NOT_FOUND } from '../boards/board-access';
 import { BoardModel } from '../boards/board.model';
 import { CommentModel } from '../comments/comment.model';
+import { createNotifications, type SentNotification } from '../notifications/notifications.service';
 import { MembershipModel } from '../workspaces/membership.model';
 import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from '@mini-trello/shared';
 import { TaskModel } from './task.model';
@@ -105,6 +106,33 @@ interface TaskChange {
   task: TaskDto;
   /** Activity recorded in the same transaction; broadcast only after it commits. */
   activities: ActivityDto[];
+  /** Notifications created in the same transaction; delivered only after it commits. */
+  notifications: SentNotification[];
+}
+
+/** Tells a new assignee (unless they assigned themselves; see createNotifications). */
+function assignmentNotifications(
+  access: BoardAccess,
+  actorId: string,
+  task: Pick<TaskShape, '_id' | 'title'>,
+  assigneeId: string | null,
+  session: mongoose.ClientSession,
+): Promise<SentNotification[]> {
+  if (!assigneeId) return Promise.resolve([]);
+  return createNotifications(
+    [
+      {
+        userId: assigneeId,
+        type: 'task.assigned',
+        actorId,
+        workspaceId: access.workspaceId,
+        boardId: access.boardId,
+        taskId: task._id.toString(),
+        taskTitle: task.title,
+      },
+    ],
+    session,
+  );
 }
 
 function activityFor(
@@ -218,14 +246,21 @@ export async function createTask(
         });
       }
       const activities = await recordActivities(entries, session);
-      return { task: toTaskDto(task), activities, created: true };
+      const notifications = await assignmentNotifications(
+        access,
+        creatorId,
+        task,
+        input.assigneeId,
+        session,
+      );
+      return { task: toTaskDto(task), activities, notifications, created: true };
     });
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
     // A retry of a request that already succeeded: return the original task, not a duplicate.
     const existing = await TaskModel.findOne({ creatorId, requestId: input.requestId }).lean();
     if (existing?.boardId.toString() !== access.boardId) throw error;
-    return { task: toTaskDto(existing), activities: [], created: false };
+    return { task: toTaskDto(existing), activities: [], notifications: [], created: false };
   }
 }
 
@@ -256,7 +291,12 @@ export async function updateTask(
       describeUpdate(access, actorId, before, updated),
       session,
     );
-    return { task: toTaskDto(updated), activities };
+    const newAssigneeId = updated.assigneeId?.toString() ?? null;
+    const reassigned = newAssigneeId !== (before.assigneeId?.toString() ?? null);
+    const notifications = reassigned
+      ? await assignmentNotifications(access, actorId, updated, newAssigneeId, session)
+      : [];
+    return { task: toTaskDto(updated), activities, notifications };
   });
   if (!result) throw await conflictOrNotFound(access.taskId);
   return result;
@@ -329,7 +369,7 @@ export async function moveTask(
       });
     }
     const activities = await recordActivities(entries, session);
-    return { task: toTaskDto(updated), activities };
+    return { task: toTaskDto(updated), activities, notifications: [] };
   });
   if (!result) throw await conflictOrNotFound(access.taskId);
   return result;

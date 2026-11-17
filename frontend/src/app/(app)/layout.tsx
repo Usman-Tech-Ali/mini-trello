@@ -3,6 +3,7 @@ import { AppSidebar } from '@/components/layout/app-sidebar';
 import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AuthGuard } from '@/features/auth/components/auth-guard';
+import { NotificationBell } from '@/features/notifications/components/notification-bell';
 import { ConnectionStatusBadge } from '@/features/realtime/components/connection-status';
 import { RealtimeProvider } from '@/features/realtime/realtime-provider';
 
@@ -24,6 +25,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
               <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
               <AppBreadcrumb />
               <ConnectionStatusBadge />
+              <NotificationBell />
             </header>
             <main
               id="main-content"

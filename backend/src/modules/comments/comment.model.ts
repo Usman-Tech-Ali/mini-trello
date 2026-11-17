@@ -7,6 +7,8 @@ const commentSchema = new Schema(
     boardId: { type: Schema.Types.ObjectId, ref: 'Board', required: true },
     authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     body: { type: String, required: true, trim: true, maxlength: 2000 },
+    // Workspace members mentioned with "@Name" (validated when the comment was posted).
+    mentionIds: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     requestId: { type: String, required: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } },

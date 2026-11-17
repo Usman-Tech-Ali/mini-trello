@@ -31,3 +31,27 @@ export function useTaskFilters() {
 
   return { filters, setFilters, clearFilters };
 }
+
+/**
+ * The open task is in the URL too (`?task=<id>`), so a notification or a shared link can open
+ * a specific task, and the back button closes it.
+ */
+export function useOpenTaskParam() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const openTaskId = searchParams.get('task');
+
+  const setOpenTaskId = useCallback(
+    (taskId: string | null) => {
+      const query = applyFilterPatch(searchParams, { task: taskId ?? undefined });
+      const href = query ? `${pathname}?${query}` : pathname;
+      // Opening adds a history entry (back closes it); closing replaces it.
+      if (taskId) router.push(href, { scroll: false });
+      else router.replace(href, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
+  return { openTaskId, setOpenTaskId };
+}

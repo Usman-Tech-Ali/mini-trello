@@ -259,3 +259,36 @@ describe('personal workspace events', () => {
     }
   });
 });
+
+describe('notification delivery', () => {
+  it('delivers a notification only to the recipient, after the write', async () => {
+    const task = await createTask('Needs an owner');
+    const bobGets = nextEvent(bobSocket, 'notification:created');
+    const aliceGets = receives(aliceSocket, 'notification:created');
+    await aliceApi()
+      .patch(`/api/tasks/${task.id}`)
+      .send({ version: 1, assigneeId: bob.user.id })
+      .expect(200);
+
+    expect((await bobGets).notification).toMatchObject({
+      type: 'task.assigned',
+      actorId: alice.user.id,
+      taskId: task.id,
+    });
+    expect(await aliceGets).toBe(false);
+  });
+
+  it("tells the recipient's tabs when notifications are read", async () => {
+    const task = await createTask('Owned');
+    const delivered = nextEvent(bobSocket, 'notification:created');
+    await aliceApi()
+      .patch(`/api/tasks/${task.id}`)
+      .send({ version: 1, assigneeId: bob.user.id })
+      .expect(200);
+    const { notification } = await delivered;
+
+    const changed = receives(bobSocket, 'notifications:changed', 1_000);
+    await restAs(server.http, bob).patch(`/api/notifications/${notification.id}/read`).expect(200);
+    expect(await changed).toBe(true);
+  });
+});

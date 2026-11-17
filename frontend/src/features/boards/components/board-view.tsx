@@ -13,7 +13,7 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
@@ -43,7 +43,7 @@ import { initialOf, swatchFor } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 
 import { useBoard, useCreateColumn, useDeleteBoard, useRenameBoard } from '../hooks/use-boards';
-import { useTaskFilters } from '../hooks/use-task-filters';
+import { useOpenTaskParam, useTaskFilters } from '../hooks/use-task-filters';
 import { BoardFilters } from './board-filters';
 import { BoardColumn } from './board-column';
 
@@ -93,7 +93,7 @@ function Board({ board }: { board: BoardDto }) {
   const renameBoard = useRenameBoard(board.id);
   const deleteBoard = useDeleteBoard(board);
 
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const { openTaskId, setOpenTaskId } = useOpenTaskParam();
   const [pendingTaskIds, setPendingTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<'rename' | 'add-column' | 'delete' | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -135,6 +135,13 @@ function Board({ board }: { board: BoardDto }) {
     [tasksByColumn],
   );
   const openTask = tasksQuery.data?.find((task) => task.id === openTaskId) ?? null;
+  // A link (e.g. from a notification) to a task that has since been deleted.
+  const missingTask = Boolean(openTaskId && tasksQuery.isSuccess && !openTask);
+  useEffect(() => {
+    if (!missingTask) return;
+    toast.info('That task no longer exists.');
+    setOpenTaskId(null);
+  }, [missingTask, setOpenTaskId]);
   const taskIds = useMemo(
     () => new Set((tasksQuery.data ?? []).map((task) => task.id)),
     [tasksQuery.data],
