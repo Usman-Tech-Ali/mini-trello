@@ -12,7 +12,6 @@ import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { NameDialog } from '@/components/name-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,6 +21,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCurrentUser } from '@/features/auth/hooks/use-session';
+import { PresenceAvatars } from '@/features/realtime/components/presence-avatars';
+import { useBoardChannel } from '@/features/realtime/hooks/use-board-channel';
+import { typingUsers } from '@/features/realtime/lib/remote-updates';
 import { TaskDialog } from '@/features/tasks/components/task-dialog';
 import { useBoardTasks, useMoveTask } from '@/features/tasks/hooks/use-tasks';
 import { groupTasksByColumn } from '@/features/tasks/lib/task-order';
@@ -82,6 +85,14 @@ function Board({ board }: { board: BoardDto }) {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [pendingTaskIds, setPendingTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<'rename' | 'add-column' | 'delete' | null>(null);
+  const currentUser = useCurrentUser();
+  const { onlineUserIds, typing } = useBoardChannel(board, {
+    onTaskDeleted: (taskId) => {
+      if (taskId !== openTaskId) return;
+      setOpenTaskId(null);
+      toast.info('This task was deleted by someone else.');
+    },
+  });
 
   const isAdmin = workspace.data?.role === 'admin';
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
@@ -98,6 +109,17 @@ function Board({ board }: { board: BoardDto }) {
     [tasksByColumn],
   );
   const openTask = tasksQuery.data?.find((task) => task.id === openTaskId) ?? null;
+  // Names of other people currently editing each task (live typing indicators).
+  const editorsByTask = useMemo(() => {
+    const result = new Map<string, string[]>();
+    for (const taskId of typing.keys()) {
+      const names = typingUsers(typing, taskId)
+        .filter((userId) => userId !== currentUser.id)
+        .flatMap((userId) => membersById.get(userId)?.name ?? []);
+      if (names.length > 0) result.set(taskId, names);
+    }
+    return result;
+  }, [typing, membersById, currentUser.id]);
 
   const onDragEnd = ({ draggableId, source, destination }: DropResult) => {
     if (!destination) return;
@@ -151,11 +173,11 @@ function Board({ board }: { board: BoardDto }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {workspace.data && (
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              {workspace.data.name}
-            </Badge>
-          )}
+          <PresenceAvatars
+            userIds={onlineUserIds}
+            membersById={membersById}
+            currentUserId={currentUser.id}
+          />
           <Button variant="outline" size="sm" onClick={() => setDialog('add-column')}>
             <PlusIcon aria-hidden="true" />
             Add column
@@ -203,6 +225,7 @@ function Board({ board }: { board: BoardDto }) {
                 tasks={tasksByColumn.get(column.id) ?? []}
                 membersById={membersById}
                 pendingTaskIds={pendingTaskIds}
+                editorsByTask={editorsByTask}
                 onOpenTask={setOpenTaskId}
               />
             ))}
@@ -224,6 +247,7 @@ function Board({ board }: { board: BoardDto }) {
         board={board}
         members={members}
         columnSizes={columnSizes}
+        editors={openTask ? (editorsByTask.get(openTask.id) ?? []) : []}
         onClose={() => setOpenTaskId(null)}
       />
       <NameDialog

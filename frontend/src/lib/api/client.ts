@@ -1,6 +1,7 @@
-import { apiErrorResponseSchema } from '@mini-trello/shared';
+import { apiErrorResponseSchema, SOCKET_ID_HEADER } from '@mini-trello/shared';
 
 import { env } from '@/config/env';
+import { getSocketId } from '@/lib/realtime/socket';
 
 import { ApiError } from './api-error';
 
@@ -46,6 +47,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   const { method = 'GET', body, signal } = options;
   const headers: HeadersInit = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const socketId = getSocketId();
+  if (socketId) headers[SOCKET_ID_HEADER] = socketId;
 
   let response: Response;
   try {

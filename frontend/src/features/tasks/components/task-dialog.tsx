@@ -3,9 +3,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { BoardDto, MemberDto, TaskDto, UpdateTaskInput } from '@mini-trello/shared';
 import { taskDescriptionSchema, taskPrioritySchema, taskTitleSchema } from '@mini-trello/shared';
-import { Trash2Icon } from 'lucide-react';
+import { PencilLineIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -30,6 +30,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useTypingSignal } from '@/features/realtime/hooks/use-typing-signal';
+import { describeEditors } from '@/features/realtime/lib/remote-updates';
 import { ApiError } from '@/lib/api/api-error';
 import { formatDate, formatRelative } from '@/lib/dates';
 import { applyServerErrors } from '@/lib/forms/apply-server-errors';
@@ -47,6 +49,8 @@ const formSchema = z.object({
   assigneeId: z.string(),
   // "" from an empty <input type="date"> means no due date.
   dueDate: z.union([z.literal(''), z.iso.date('Enter a valid date')]),
+  // The version the user started editing from; saves are checked against it (409 if stale).
+  version: z.number().int(),
 });
 type FormValues = z.input<typeof formSchema>;
 
@@ -58,6 +62,7 @@ function toFormValues(task: TaskDto): FormValues {
     priority: task.priority,
     assigneeId: task.assigneeId ?? UNASSIGNED,
     dueDate: task.dueDate ?? '',
+    version: task.version,
   };
 }
 
@@ -67,10 +72,19 @@ interface TaskDialogProps {
   members: MemberDto[];
   /** Number of tasks per column, used to append when the status changes. */
   columnSizes: Map<string, number>;
+  /** Names of other people editing this task right now. */
+  editors: string[];
   onClose: () => void;
 }
 
-export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskDialogProps) {
+export function TaskDialog({
+  task,
+  board,
+  members,
+  columnSizes,
+  editors,
+  onClose,
+}: TaskDialogProps) {
   const updateTask = useUpdateTask(board.id);
   const moveTask = useMoveTask(board.id);
   const deleteTask = useDeleteTask(board.id);
@@ -82,18 +96,26 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
   });
   const { errors, isSubmitting } = form.formState;
 
+  const typingSignal = useTypingSignal(board.id, task?.id);
+  const formVersion = useWatch({ control: form.control, name: 'version' });
+
   const taskId = task?.id;
   const version = task?.version;
-  // After a conflict the newer server version arrives: load it into the form for review.
-  // (The parent keys this dialog by task id, so opening another task starts fresh.)
+  // A newer version arrived (someone else saved, or our own conflict reload). Load it into the
+  // form — unless the user has unsaved edits, which must never be overwritten silently.
   useEffect(() => {
-    if (task) form.reset(toFormValues(task));
+    if (task && (!form.formState.isDirty || conflict)) form.reset(toFormValues(task));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when a different task/version arrives
   }, [taskId, version]);
 
   if (!task) return null;
 
   const creator = members.find((m) => m.userId === task.creatorId);
+  const changedRemotely = !conflict && task.version !== formVersion;
+  const close = () => {
+    typingSignal.stop();
+    onClose();
+  };
 
   const save = form.handleSubmit(async (values) => {
     const changes: Omit<UpdateTaskInput, 'version'> = {};
@@ -106,7 +128,9 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
     if (dueDate !== task.dueDate) changes.dueDate = dueDate;
 
     try {
-      let current = task;
+      typingSignal.stop();
+      // Save against the version the user started from, so a concurrent change is detected.
+      let current: TaskDto = { ...task, version: values.version };
       if (Object.keys(changes).length > 0) {
         current = await updateTask.mutateAsync({
           taskId: task.id,
@@ -121,7 +145,7 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
         });
       }
       toast.success('Task saved');
-      onClose();
+      close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'VERSION_CONFLICT') {
         setConflict(true);
@@ -138,7 +162,7 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
       onSuccess: () => {
         toast.success('Task deleted');
         setConfirmDelete(false);
-        onClose();
+        close();
       },
       onError: (error) => {
         setConfirmDelete(false);
@@ -149,7 +173,7 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
 
   return (
     <>
-      <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <Dialog open onOpenChange={(open) => !open && close()}>
         <DialogContent className="sm:max-w-2xl">
           <form onSubmit={(event) => void save(event)} noValidate>
             <DialogHeader>
@@ -162,6 +186,18 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
 
             <div className="grid gap-6 py-4 sm:grid-cols-[1fr_200px]">
               <FieldGroup>
+                {editors.length > 0 && (
+                  <p
+                    className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
+                    aria-live="polite"
+                  >
+                    <PencilLineIcon className="size-4 shrink-0" aria-hidden="true" />
+                    {describeEditors(editors)} this task too.
+                  </p>
+                )}
+                {changedRemotely && (
+                  <FormError message="Someone else just saved changes to this task. If you save, you'll first be shown their version to review." />
+                )}
                 {conflict && (
                   <FormError message="Someone else changed this task while you were editing. The latest version is loaded below — review it and save again." />
                 )}
@@ -172,7 +208,7 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
                     id="task-title"
                     aria-invalid={!!errors.title}
                     aria-describedby={errors.title ? 'task-title-error' : undefined}
-                    {...form.register('title')}
+                    {...form.register('title', { onChange: typingSignal.onActivity })}
                   />
                   <FieldError id="task-title-error" errors={[errors.title]} />
                 </Field>
@@ -184,7 +220,7 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
                     placeholder="Add more detail…"
                     aria-invalid={!!errors.description}
                     aria-describedby={errors.description ? 'task-description-error' : undefined}
-                    {...form.register('description')}
+                    {...form.register('description', { onChange: typingSignal.onActivity })}
                   />
                   <FieldError id="task-description-error" errors={[errors.description]} />
                 </Field>
@@ -280,7 +316,7 @@ export function TaskDialog({ task, board, members, columnSizes, onClose }: TaskD
                 Delete
               </Button>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={close}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>

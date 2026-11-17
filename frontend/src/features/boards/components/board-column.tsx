@@ -28,6 +28,8 @@ interface BoardColumnProps {
   tasks: TaskDto[];
   membersById: Map<string, MemberDto>;
   pendingTaskIds: ReadonlySet<string>;
+  /** taskId → names of others editing it right now. */
+  editorsByTask: Map<string, string[]>;
   onOpenTask: (taskId: string) => void;
 }
 
@@ -37,6 +39,7 @@ export function BoardColumn({
   tasks,
   membersById,
   pendingTaskIds,
+  editorsByTask,
   onOpenTask,
 }: BoardColumnProps) {
   const [renaming, setRenaming] = useState(false);
@@ -128,6 +131,7 @@ export function BoardColumn({
                       task={task}
                       assignee={task.assigneeId ? membersById.get(task.assigneeId) : undefined}
                       isDragging={dragSnapshot.isDragging}
+                      editors={editorsByTask.get(task.id)}
                     />
                   </div>
                 )}
