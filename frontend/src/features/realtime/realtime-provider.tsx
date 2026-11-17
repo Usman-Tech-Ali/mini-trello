@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-import { setSession } from '@/features/auth/hooks/use-session';
+import { authKeys } from '@/features/auth/api/auth.keys';
 import { workspaceKeys } from '@/features/workspaces/api/workspaces.keys';
 import { getSocket } from '@/lib/realtime/socket';
 
@@ -44,8 +44,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       );
     };
     const onConnectError = (error: Error) => {
-      if (error.message === 'UNAUTHENTICATED') setSession(queryClient, null);
-      else setStatus(socket.active ? 'reconnecting' : 'offline');
+      if (error.message === 'UNAUTHENTICATED') {
+        // Ask the API whether the session is really gone (a ticket can also fail on a network
+        // blip); if it is, the auth guard sends the user to sign in.
+        setStatus('offline');
+        void queryClient.invalidateQueries({ queryKey: authKeys.session() });
+      } else setStatus(socket.active ? 'reconnecting' : 'offline');
     };
 
     // Added to / removed from a workspace, or role changed: reload workspaces (sidebar, lists, roles).

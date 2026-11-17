@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 
 import { AppError } from '../lib/app-error';
-import { SESSION_COOKIE, verifySessionToken } from '../modules/auth/session';
+import { SESSION_COOKIE, verifySession } from '../modules/auth/session';
 
 function readSessionCookie(req: Request): string | undefined {
   // Express types parsed cookies as `any`; treat them as untrusted input.
@@ -13,11 +13,11 @@ function readSessionCookie(req: Request): string | undefined {
 
 export const requireAuth: RequestHandler = async (req, _res, next) => {
   const token = readSessionCookie(req);
-  const userId = token ? await verifySessionToken(token) : null;
-  if (!userId) {
+  const session = token ? await verifySession(token) : null;
+  if (!session) {
     next(new AppError(401, 'UNAUTHENTICATED', 'Please sign in to continue.'));
     return;
   }
-  req.auth = { userId };
+  req.auth = { userId: session.userId, sessionExpiresAt: session.expiresAt };
   next();
 };

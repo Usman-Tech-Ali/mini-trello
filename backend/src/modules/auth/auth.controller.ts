@@ -1,4 +1,4 @@
-import type { AuthResponse, UserDto } from '@mini-trello/shared';
+import type { AuthResponse, SocketTicketResponse, UserDto } from '@mini-trello/shared';
 import { loginSchema, registerSchema } from '@mini-trello/shared';
 import type { Request, Response } from 'express';
 
@@ -11,6 +11,7 @@ import {
   SESSION_TTL_SECONDS,
   sessionCookieOptions,
   signSessionToken,
+  signSocketTicket,
 } from './session';
 
 async function startSession(res: Response, user: UserDto): Promise<void> {
@@ -45,4 +46,17 @@ export async function me(req: Request, res: Response<AuthResponse>): Promise<voi
     throw new AppError(401, 'UNAUTHENTICATED', 'Please sign in to continue.');
   }
   res.json({ user });
+}
+
+/** A one-minute pass for the Socket.IO handshake (see signSocketTicket). */
+export async function socketTicket(
+  req: Request,
+  res: Response<SocketTicketResponse>,
+): Promise<void> {
+  const { userId, sessionExpiresAt } = req.auth ?? {};
+  if (!userId || sessionExpiresAt === undefined) {
+    throw new AppError(401, 'UNAUTHENTICATED', 'Please sign in to continue.');
+  }
+  res.set('Cache-Control', 'no-store');
+  res.json({ token: await signSocketTicket(userId, sessionExpiresAt) });
 }

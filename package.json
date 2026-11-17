@@ -1,7 +1,7 @@
 {
   "name": "mini-trello",
   "private": true,
-  "description": "Mini Trello — collaborative Kanban board (Next.js, Express, Socket.IO, MongoDB)",
+  "description": "Mini Trello \u2014 collaborative Kanban board (Next.js, Express, Socket.IO, MongoDB)",
   "workspaces": [
     "shared",
     "backend",
@@ -11,8 +11,8 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors blue,magenta \"npm run dev -w @mini-trello/backend\" \"npm run dev -w @mini-trello/frontend\"",
-    "build": "npm run build -w @mini-trello/backend && npm run build -w @mini-trello/frontend",
+    "dev": "node init && concurrently --kill-others-on-fail --names api,web --prefix-colors blue,magenta \"npm run dev -w @mini-trello/backend\" \"npm run dev -w @mini-trello/frontend\"",
+    "build": "node init && npm run build -w @mini-trello/backend && npm run build -w @mini-trello/frontend",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

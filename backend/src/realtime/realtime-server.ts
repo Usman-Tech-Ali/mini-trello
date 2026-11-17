@@ -18,7 +18,7 @@ import { config } from '../config/env';
 import { AppError } from '../lib/app-error';
 import { logger } from '../lib/logger';
 import { assertBoardAccess } from '../modules/boards/board-access';
-import { SESSION_COOKIE, verifySession } from '../modules/auth/session';
+import { SESSION_COOKIE, verifySession, verifySocketTicket } from '../modules/auth/session';
 import { TaskModel } from '../modules/tasks/task.model';
 import { PresenceTracker } from './presence';
 
@@ -190,10 +190,21 @@ export function createRealtimeServer(httpServer: HttpServer): RealtimeServer {
     },
   });
 
-  // Authenticate the handshake with the same httpOnly session cookie as the REST API.
+  // Authenticate the handshake with a socket ticket (`auth: { token }`), or else with the same
+  // httpOnly session cookie as the REST API (when the web app and API share a site).
   server.use((socket, next) => {
-    const token = parseCookies(socket.request.headers.cookie ?? '')[SESSION_COOKIE];
-    void (token ? verifySession(token) : Promise.resolve(null)).then((session) => {
+    const auth: unknown = socket.handshake.auth;
+    const ticket =
+      typeof auth === 'object' && auth !== null && 'token' in auth && typeof auth.token === 'string'
+        ? auth.token
+        : undefined;
+    const cookie = parseCookies(socket.request.headers.cookie ?? '')[SESSION_COOKIE];
+    const verified = ticket
+      ? verifySocketTicket(ticket)
+      : cookie
+        ? verifySession(cookie)
+        : Promise.resolve(null);
+    void verified.then((session) => {
       if (!session) {
         next(new Error('UNAUTHENTICATED'));
         return;

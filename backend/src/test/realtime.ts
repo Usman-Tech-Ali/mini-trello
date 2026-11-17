@@ -76,12 +76,13 @@ export function restAs(http: HttpServer, session: SessionUser, socketId?: string
 
 export function connectSocket(
   url: string,
-  options: { cookie?: string; origin?: string } = {},
+  options: { cookie?: string; origin?: string; ticket?: string } = {},
 ): Promise<ClientSocket> {
   const socket: ClientSocket = connect(url, {
     transports: ['websocket'],
     forceNew: true,
     reconnection: false,
+    ...(options.ticket && { auth: { token: options.ticket } }),
     extraHeaders: {
       Origin: options.origin ?? TEST_ORIGIN,
       ...(options.cookie && { Cookie: options.cookie }),

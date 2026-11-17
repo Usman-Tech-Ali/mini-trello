@@ -29,3 +29,8 @@ export interface UserDto {
 export interface AuthResponse {
   user: UserDto;
 }
+
+/** A short-lived pass for the Socket.IO handshake, sent as `auth: { token }`. */
+export interface SocketTicketResponse {
+  token: string;
+}

@@ -22,6 +22,17 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // With NEXT_PUBLIC_API_PROXY=true the browser calls this site's /api/* and /health, and Next.js
+  // forwards them to the API, so the session cookie belongs to this site (works where browsers
+  // block third-party cookies: Safari, Chrome Incognito). Socket.IO still connects directly.
+  rewrites() {
+    const api = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '');
+    if (process.env.NEXT_PUBLIC_API_PROXY !== 'true' || !api) return Promise.resolve([]);
+    return Promise.resolve([
+      { source: '/api/:path*', destination: `${api}/api/:path*` },
+      { source: '/health', destination: `${api}/health` },
+    ]);
+  },
   headers() {
     return Promise.resolve([{ source: '/:path*', headers: securityHeaders }]);
   },

@@ -36,7 +36,7 @@ export function reportClientError(source: ClientLogInput['source'], value: unkno
     url: window.location.pathname + window.location.search,
   };
   // Fire and forget; a failing reporter must never cause more errors.
-  fetch(`${env.apiUrl}/api/dev/client-logs`, {
+  fetch(`${env.restBaseUrl}/api/dev/client-logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),

@@ -11,11 +11,11 @@ TanStack Query · shadcn/ui + Tailwind CSS · zod · Vitest
 
 **https://usman-mini-trello.vercel.app** · API: https://mini-trello-api.onrender.com/health
 
-- Register two accounts (for example in Chrome and in an incognito window) and add the second one to
-  your workspace by email to see real-time updates.
+- Register two accounts (for example in a normal and an incognito window) and add the second one to
+  your workspace by email to see real-time updates. Works in every browser, including Safari and
+  incognito windows.
 - Runs on free tiers: the API sleeps after 15 idle minutes, so the **first request can take about a
-  minute**. Use Chrome, Edge or Firefox; Safari blocks the cross-site session cookie (see
-  [Deploy](#deploy-free-tiers)).
+  minute**.
 
 ## Contents
 
@@ -81,8 +81,11 @@ workspace by email. `npm run check` runs format check, lint, typecheck and all t
 | `TRUST_PROXY`                                          | number of reverse proxies in front of the API (default 0)                       |
 | `PORT`, `AUTH_RATE_LIMIT_MAX`, `LOG_LEVEL`, `LOG_FILE` | optional                                                                        |
 
-Frontend: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`). Deploy web and API on the same site
-(e.g. `app.example.com` + `api.example.com`) so the session cookie stays first-party.
+Frontend: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`) and `NEXT_PUBLIC_API_PROXY`
+(default `false`). With `true`, the browser calls the web app's own `/api/*` and Next.js forwards it
+to the API, so the session cookie is first-party even when the web app and API are on different
+sites. Socket.IO always connects to the API directly, with a one-minute ticket (see
+[Real-time](#real-time)).
 
 ### Deploy (free tiers)
 
@@ -90,12 +93,13 @@ Frontend: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`). Deploy web and A
   (`0.0.0.0/0`) because the API host's IPs change.
 - **API:** Render free web service from this repo using `backend/Dockerfile` (health check
   `/health`). Set `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGINS=<web URL>`,
-  `TRUST_PROXY=1`, `COOKIE_SAME_SITE=none`, `COOKIE_SECURE=true`. Free services sleep after 15 idle
+  `TRUST_PROXY=1`, `COOKIE_SAME_SITE=lax`, `COOKIE_SECURE=true`. Free services sleep after 15 idle
   minutes; the first request then takes about a minute.
-- **Web:** Vercel with root directory `frontend` and `NEXT_PUBLIC_API_URL=<API URL>`.
-- `*.vercel.app` and `*.onrender.com` are different sites, so the session cookie is a cross-site
-  cookie: works in Chrome, Edge and Firefox, but Safari blocks it. With a custom domain
-  (`app.example.com` + `api.example.com`) keep `COOKIE_SAME_SITE=lax` and it works everywhere.
+- **Web:** Vercel with root directory `frontend`, `NEXT_PUBLIC_API_URL=<API URL>` and
+  `NEXT_PUBLIC_API_PROXY=true`.
+- `*.vercel.app` and `*.onrender.com` are different sites. Browsers that block third-party cookies
+  (Safari, Chrome incognito) would drop a cookie set by the API's own domain, so REST goes through
+  the Vercel domain instead and the cookie stays first-party.
 
 ## Architecture
 
@@ -144,7 +148,7 @@ Anything a user can't access returns **404**; a member without the Admin role ge
 
 | Area              | Endpoints                                                                                                                                                                                           |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth              | `POST /api/auth/register`, `/login`, `/logout` · `GET /api/auth/me`                                                                                                                                 |
+| Auth              | `POST /api/auth/register`, `/login`, `/logout`, `/socket-ticket` · `GET /api/auth/me`                                                                                                               |
 | Workspaces        | `GET/POST /api/workspaces` · `GET /api/workspaces/:id` · `GET/POST …/:id/members` (add: Admin) · `PATCH/DELETE …/members/:userId` (Admin, or leave yourself)                                        |
 | Boards & columns  | `GET/POST /api/workspaces/:id/boards` · `GET/PATCH/DELETE /api/boards/:boardId` (delete: Admin) · `POST /api/boards/:boardId/columns` · `PATCH/DELETE …/columns/:columnId` (delete only when empty) |
 | Tasks             | `GET /api/boards/:boardId/tasks?q=&assignee=&priority=&column=` · `POST /api/boards/:boardId/tasks` · `GET/PATCH/DELETE /api/tasks/:taskId` · `PATCH /api/tasks/:taskId/move`                       |
@@ -155,8 +159,12 @@ Anything a user can't access returns **404**; a member without the Admin role ge
 
 ## Real-time
 
-- **Handshake:** allowed `Origin` + the same session cookie as REST; sockets close when the session
-  expires.
+- **Handshake:** allowed `Origin` + a **socket ticket**: before each (re)connect the client calls
+  `POST /api/auth/socket-ticket` (cookie-authenticated) and sends the result as `auth.token`. The
+  ticket is a JWT valid for one minute with its own audience, so it is never accepted as a session
+  and vice versa. It's needed because the socket connects to the API host directly (proxies like
+  Vercel can't forward WebSockets) and can't send the web app's cookie; without a ticket the
+  handshake falls back to the cookie. Sockets close when the session expires.
 - **Rooms:** `board:<id>` (joined via `board:join`, which re-checks membership in the database) and
   `user:<id>` (personal events). Removing a member immediately takes their sockets out of that
   workspace's boards.
@@ -212,14 +220,15 @@ activity infrastructure without new services. Also included: **E — task histor
 
 ## Limitations and how I'd finish them
 
-| Limitation                                                                                   | Next step                                                                                                   |
-| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Invites only for registered users; invite and sign-up reveal whether an email has an account | Challenge D: e-mailed invite links with expiry and accept/reject, and a neutral "check your inbox" response |
-| One API instance: presence, rooms and rate limits live in memory                             | Socket.IO Redis adapter and a Redis store for presence and rate limits                                      |
-| 24-hour sessions, no refresh or early revocation                                             | Short access token + rotating refresh token, or a per-user token version checked on each request            |
-| Title search is a scoped regex                                                               | MongoDB Atlas Search (or a text index) once boards hold thousands of tasks                                  |
-| Restore keeps the task's current column                                                      | Offer "restore column too" in the history view                                                              |
-| No e-mail, attachments or unread-comment counts                                              | Out of scope for the timebox (attachments = Challenge C)                                                    |
+| Limitation                                                                                        | Next step                                                                                                   |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Invites only for registered users; invite and sign-up reveal whether an email has an account      | Challenge D: e-mailed invite links with expiry and accept/reject, and a neutral "check your inbox" response |
+| One API instance: presence, rooms and rate limits live in memory                                  | Socket.IO Redis adapter and a Redis store for presence and rate limits                                      |
+| Behind the Vercel proxy, sign-up/sign-in rate limits are per Vercel edge address, not per user IP | A custom domain for web + API (no proxy), or trust Vercel's forwarded client IP                             |
+| 24-hour sessions, no refresh or early revocation                                                  | Short access token + rotating refresh token, or a per-user token version checked on each request            |
+| Title search is a scoped regex                                                                    | MongoDB Atlas Search (or a text index) once boards hold thousands of tasks                                  |
+| Restore keeps the task's current column                                                           | Offer "restore column too" in the history view                                                              |
+| No e-mail, attachments or unread-comment counts                                                   | Out of scope for the timebox (attachments = Challenge C)                                                    |
 
 ## Credits and AI assistance
 

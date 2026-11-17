@@ -4,7 +4,7 @@ import type { MembershipContext } from '../modules/workspaces/workspace-access';
 declare module 'express-serve-static-core' {
   interface Request {
     /** Set by `requireAuth`. */
-    auth?: { userId: string };
+    auth?: { userId: string; /** Unix seconds. */ sessionExpiresAt: number };
     /** Set by `requireWorkspaceMember`. */
     membership?: MembershipContext;
     /** Set by `requireBoardAccess`. */
