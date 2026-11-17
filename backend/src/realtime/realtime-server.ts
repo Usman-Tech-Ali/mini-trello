@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 
 import type {
+  ActivityDto,
   ClientToServerEvents,
   ErrorCode,
   ServerToClientEvents,
@@ -213,5 +214,15 @@ export function revokeWorkspaceAccess(workspaceId: string, userId: string): void
       leaveBoard(socket, boardId);
       socket.emit('board:access-revoked', { boardId });
     }
+  }
+}
+
+/** Activity goes to everyone on the board, the actor included (their feed updates the same way). */
+export function emitActivity(activities: ActivityDto[]): void {
+  for (const activity of activities) {
+    emitToBoard(activity.boardId, undefined, 'activity:created', {
+      boardId: activity.boardId,
+      activity,
+    });
   }
 }

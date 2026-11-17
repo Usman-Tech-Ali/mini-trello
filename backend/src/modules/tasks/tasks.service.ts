@@ -1,12 +1,14 @@
-import type { TaskDto, UpdateTaskInput } from '@mini-trello/shared';
+import type { ActivityDto, ActivityTaskField, TaskDto, UpdateTaskInput } from '@mini-trello/shared';
 import type { createTaskSchema, moveTaskSchema } from '@mini-trello/shared';
 import mongoose, { type ClientSession, type Types } from 'mongoose';
 import type { z } from 'zod';
 
 import { AppError } from '../../lib/app-error';
 import { isDuplicateKeyError } from '../../lib/mongo-errors';
+import { type NewActivity, recordActivities } from '../activity/activity.service';
 import { type BoardAccess, type TaskAccess, TASK_NOT_FOUND } from '../boards/board-access';
 import { BoardModel } from '../boards/board.model';
+import { CommentModel } from '../comments/comment.model';
 import { MembershipModel } from '../workspaces/membership.model';
 import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from '@mini-trello/shared';
 import { TaskModel } from './task.model';
@@ -92,6 +94,52 @@ async function conflictOrNotFound(taskId: string): Promise<AppError> {
     : new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
 }
 
+interface TaskChange {
+  task: TaskDto;
+  /** Activity recorded in the same transaction; broadcast only after it commits. */
+  activities: ActivityDto[];
+}
+
+function activityFor(
+  access: BoardAccess,
+  actorId: string,
+  task: Pick<TaskShape, '_id' | 'title'>,
+): Pick<NewActivity, 'boardId' | 'workspaceId' | 'taskId' | 'actorId' | 'taskTitle'> {
+  return {
+    boardId: access.boardId,
+    workspaceId: access.workspaceId,
+    taskId: task._id.toString(),
+    actorId,
+    taskTitle: task.title,
+  };
+}
+
+const sameDate = (a?: Date | null, b?: Date | null) =>
+  (a?.getTime() ?? null) === (b?.getTime() ?? null);
+
+/** Describes an edit as a `task.updated` entry (field list) and/or a `task.assigned` entry. */
+function describeUpdate(
+  access: BoardAccess,
+  actorId: string,
+  before: TaskShape,
+  after: TaskShape,
+): NewActivity[] {
+  const base = activityFor(access, actorId, after);
+  const fields: ActivityTaskField[] = [];
+  if (before.title !== after.title) fields.push('title');
+  if (before.description !== after.description) fields.push('description');
+  if (before.priority !== after.priority) fields.push('priority');
+  if (!sameDate(before.dueDate, after.dueDate)) fields.push('dueDate');
+
+  const entries: NewActivity[] = [];
+  if (fields.length > 0) entries.push({ ...base, action: 'task.updated', details: { fields } });
+  const assigneeId = after.assigneeId?.toString() ?? null;
+  if ((before.assigneeId?.toString() ?? null) !== assigneeId) {
+    entries.push({ ...base, action: 'task.assigned', details: { assigneeId } });
+  }
+  return entries;
+}
+
 export async function listTasks(boardId: string): Promise<TaskDto[]> {
   const tasks = await TaskModel.find({ boardId }).sort({ position: 1 }).lean();
   return tasks.map(toTaskDto);
@@ -107,7 +155,7 @@ export async function createTask(
   access: BoardAccess,
   creatorId: string,
   input: CreateTaskData,
-): Promise<{ task: TaskDto; created: boolean }> {
+): Promise<TaskChange & { created: boolean }> {
   try {
     return await mongoose.connection.transaction(async (session) => {
       await assertColumnOnBoard(access.boardId, input.columnId, session);
@@ -138,41 +186,83 @@ export async function createTask(
         { session },
       );
       if (!task) throw new Error('Task was not created');
-      return { task: toTaskDto(task), created: true };
+
+      const base = activityFor(access, creatorId, task);
+      const entries: NewActivity[] = [{ ...base, action: 'task.created' }];
+      if (input.assigneeId) {
+        entries.push({
+          ...base,
+          action: 'task.assigned',
+          details: { assigneeId: input.assigneeId },
+        });
+      }
+      const activities = await recordActivities(entries, session);
+      return { task: toTaskDto(task), activities, created: true };
     });
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
     // A retry of a request that already succeeded: return the original task, not a duplicate.
     const existing = await TaskModel.findOne({ creatorId, requestId: input.requestId }).lean();
     if (existing?.boardId.toString() !== access.boardId) throw error;
-    return { task: toTaskDto(existing), created: false };
+    return { task: toTaskDto(existing), activities: [], created: false };
   }
 }
 
 /** Applies a partial update only if `version` still matches; otherwise 409 VERSION_CONFLICT. */
-export async function updateTask(access: TaskAccess, input: UpdateTaskInput): Promise<TaskDto> {
+export async function updateTask(
+  access: TaskAccess,
+  actorId: string,
+  input: UpdateTaskInput,
+): Promise<TaskChange> {
   const { version, dueDate, ...fields } = input;
   const changes: Record<string, unknown> = { ...fields };
   if (dueDate !== undefined) changes.dueDate = toDueDate(dueDate);
 
-  const updated = await mongoose.connection.transaction(async (session) => {
+  const result = await mongoose.connection.transaction(async (session) => {
     if (fields.assigneeId !== undefined) {
       await assertAssignable(access.workspaceId, fields.assigneeId, session);
     }
-    return TaskModel.findOneAndUpdate(
+    // The previous state is only needed to describe the change in the activity feed.
+    const before = await TaskModel.findOne({ _id: access.taskId, version }).session(session).lean();
+    if (!before) return null;
+    const updated = await TaskModel.findOneAndUpdate(
       { _id: access.taskId, version },
       { $set: changes, $inc: { version: 1 } },
       { session, returnDocument: 'after' },
     ).lean();
+    if (!updated) return null;
+    const activities = await recordActivities(
+      describeUpdate(access, actorId, before, updated),
+      session,
+    );
+    return { task: toTaskDto(updated), activities };
   });
-  if (!updated) throw await conflictOrNotFound(access.taskId);
-  return toTaskDto(updated);
+  if (!result) throw await conflictOrNotFound(access.taskId);
+  return result;
 }
 
 /** Moves a task to `index` in `columnId`; version-checked like any other edit. */
-export async function moveTask(access: TaskAccess, input: MoveTaskData): Promise<TaskDto> {
-  const updated = await mongoose.connection.transaction(async (session) => {
-    await assertColumnOnBoard(access.boardId, input.columnId, session);
+export async function moveTask(
+  access: TaskAccess,
+  actorId: string,
+  input: MoveTaskData,
+): Promise<TaskChange> {
+  const result = await mongoose.connection.transaction(async (session) => {
+    const board = await BoardModel.findOne({ _id: access.boardId, 'columns._id': input.columnId })
+      .select('columns')
+      .session(session)
+      .lean();
+    if (!board) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Some fields are invalid.', {
+        columnId: ['Column not found on this board.'],
+      });
+    }
+
+    const before = await TaskModel.findOne({ _id: access.taskId, version: input.version })
+      .select('columnId')
+      .session(session)
+      .lean();
+    if (!before) return null;
 
     const siblings = await TaskModel.find({
       boardId: access.boardId,
@@ -198,17 +288,41 @@ export async function moveTask(access: TaskAccess, input: MoveTaskData): Promise
       position = positionForIndex(positions, input.index) ?? POSITION_STEP;
     }
 
-    return TaskModel.findOneAndUpdate(
+    const updated = await TaskModel.findOneAndUpdate(
       { _id: access.taskId, version: input.version },
       { $set: { columnId: input.columnId, position }, $inc: { version: 1 } },
       { session, returnDocument: 'after' },
     ).lean();
+    if (!updated) return null;
+
+    // Reordering within a column is not worth a feed entry; changing column (status) is.
+    const fromColumnId = before.columnId.toString();
+    const entries: NewActivity[] = [];
+    if (fromColumnId !== input.columnId) {
+      const columnName = (id: string) =>
+        board.columns.find((column) => column._id.toString() === id)?.name ?? 'a deleted column';
+      entries.push({
+        ...activityFor(access, actorId, updated),
+        action: 'task.moved',
+        details: { fromColumn: columnName(fromColumnId), toColumn: columnName(input.columnId) },
+      });
+    }
+    const activities = await recordActivities(entries, session);
+    return { task: toTaskDto(updated), activities };
   });
-  if (!updated) throw await conflictOrNotFound(access.taskId);
-  return toTaskDto(updated);
+  if (!result) throw await conflictOrNotFound(access.taskId);
+  return result;
 }
 
-export async function deleteTask(taskId: string): Promise<void> {
-  const result = await TaskModel.deleteOne({ _id: taskId });
-  if (result.deletedCount === 0) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
+/** Deletes the task and its comments; the activity log keeps a record of it. */
+export async function deleteTask(access: TaskAccess, actorId: string): Promise<ActivityDto[]> {
+  return mongoose.connection.transaction(async (session) => {
+    const task = await TaskModel.findOneAndDelete({ _id: access.taskId }, { session }).lean();
+    if (!task) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
+    await CommentModel.deleteMany({ taskId: access.taskId }, { session });
+    return recordActivities(
+      [{ ...activityFor(access, actorId, task), action: 'task.deleted' }],
+      session,
+    );
+  });
 }
