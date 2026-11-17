@@ -34,6 +34,11 @@ export function formatDueDate(dueDate: string): string {
   return shortDateFormat.format(parseCalendarDate(dueDate));
 }
 
+/** A calendar date ("2026-11-30") in full, e.g. "Nov 30, 2026". */
+export function formatCalendarDate(value: string): string {
+  return dateFormat.format(parseCalendarDate(value));
+}
+
 export function formatRelative(iso: string): string {
   const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
   const units: [Intl.RelativeTimeFormatUnit, number][] = [

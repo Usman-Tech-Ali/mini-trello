@@ -32,12 +32,14 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { TaskComments } from '@/features/comments/components/task-comments';
+import { TaskHistory } from '@/features/history/components/task-history';
 import { useCurrentUser } from '@/features/auth/hooks/use-session';
 import { useTypingSignal } from '@/features/realtime/hooks/use-typing-signal';
 import { describeEditors } from '@/features/realtime/lib/remote-updates';
 import { ApiError } from '@/lib/api/api-error';
 import { formatDate, formatRelative } from '@/lib/dates';
 import { applyServerErrors } from '@/lib/forms/apply-server-errors';
+import { cn } from '@/lib/utils';
 
 import { useDeleteTask, useMoveTask, useUpdateTask } from '../hooks/use-tasks';
 import { PRIORITIES, priorityConfig } from '../lib/priority';
@@ -94,6 +96,7 @@ export function TaskDialog({
   const currentUser = useCurrentUser();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [tab, setTab] = useState<'details' | 'history'>('details');
   const [conflict, setConflict] = useState(false);
   const form = useForm<FormValues, unknown, z.output<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -202,7 +205,36 @@ export function TaskDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-6 py-4 sm:grid-cols-[1fr_200px]">
+            <div role="tablist" aria-label="Task views" className="mt-3 flex gap-1 border-b">
+              {(['details', 'history'] as const).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="tab"
+                  id={`task-tab-${name}`}
+                  aria-selected={tab === name}
+                  aria-controls={`task-panel-${name}`}
+                  onClick={() => setTab(name)}
+                  className={cn(
+                    '-mb-px border-b-2 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    tab === name
+                      ? 'border-primary text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {name === 'details' ? 'Details' : 'History'}
+                </button>
+              ))}
+            </div>
+
+            {/* Kept mounted while History is open, so unsaved edits survive switching tabs. */}
+            <div
+              role="tabpanel"
+              id="task-panel-details"
+              aria-labelledby="task-tab-details"
+              hidden={tab !== 'details'}
+              className="grid gap-6 py-4 sm:grid-cols-[1fr_200px]"
+            >
               <FieldGroup>
                 {editors.length > 0 && (
                   <p
@@ -324,7 +356,7 @@ export function TaskDialog({
               </FieldGroup>
             </div>
 
-            <DialogFooter className="sm:justify-between">
+            <DialogFooter className={cn('sm:justify-between', tab !== 'details' && 'hidden')}>
               <Button
                 type="button"
                 variant="ghost"
@@ -344,8 +376,25 @@ export function TaskDialog({
               </div>
             </DialogFooter>
           </form>
-          <Separator />
-          <TaskComments taskId={task.id} membersById={membersById} currentUserId={currentUser.id} />
+          {tab === 'details' ? (
+            <>
+              <Separator />
+              <TaskComments
+                taskId={task.id}
+                membersById={membersById}
+                currentUserId={currentUser.id}
+              />
+            </>
+          ) : (
+            <div role="tabpanel" id="task-panel-history" aria-labelledby="task-tab-history">
+              <TaskHistory
+                task={task}
+                boardId={board.id}
+                membersById={membersById}
+                hasUnsavedChanges={form.formState.isDirty}
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
