@@ -155,6 +155,16 @@
   html {
     @apply font-sans;
   }
+  /* No double-tap-to-zoom delay on controls (mobile). */
+  a,
+  button,
+  input,
+  label,
+  select,
+  textarea,
+  [role='button'] {
+    touch-action: manipulation;
+  }
 }
 
 /* Motion for the auth showcase panel; disabled for users who prefer reduced motion. */

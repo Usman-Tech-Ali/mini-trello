@@ -31,7 +31,7 @@ export function TaskComments({ taskId, membersById }: TaskCommentsProps) {
         <MessageSquareIcon className="size-4 text-muted-foreground" aria-hidden="true" />
         Comments
         {comments.length > 0 && (
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground tabular-nums">
             {comments.length}
             {commentsQuery.hasNextPage ? '+' : ''}
           </span>

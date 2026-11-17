@@ -50,7 +50,7 @@ export function ActivityPanel({
           <SheetDescription>Everything that happened on this board, newest first.</SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
           {activityQuery.isPending ? (
             <div className="flex flex-col gap-4" aria-label="Loading activity">
               {Array.from({ length: 5 }, (_, i) => (

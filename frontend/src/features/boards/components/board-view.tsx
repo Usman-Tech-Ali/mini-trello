@@ -179,7 +179,7 @@ function Board({ board }: { board: BoardDto }) {
           </span>
           <div className="min-w-0">
             <h1 className="truncate font-display text-3xl tracking-tight">{board.name}</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground tabular-nums">
               {tasksQuery.data ? `${tasksQuery.data.length} tasks` : 'Loading tasks…'} ·{' '}
               {board.columns.length} columns
             </p>

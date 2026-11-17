@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist_Mono, Instrument_Sans, Instrument_Serif } from 'next/font/google';
 
 import { Providers } from './providers';
@@ -28,6 +28,11 @@ export const metadata: Metadata = {
     template: '%s · Mini Trello',
   },
   description: 'Collaborative Kanban boards with real-time updates.',
+};
+
+// Matches --background, so mobile browser chrome blends with the page.
+export const viewport: Viewport = {
+  themeColor: 'oklch(0.985 0.004 85)',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

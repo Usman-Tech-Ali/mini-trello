@@ -10,6 +10,12 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   return (
     <AuthGuard>
       <RealtimeProvider>
+        <a
+          href="#main-content"
+          className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:rounded-md focus-visible:bg-background focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          Skip to content
+        </a>
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset className="min-w-0">
@@ -19,7 +25,13 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
               <AppBreadcrumb />
               <ConnectionStatusBadge />
             </header>
-            <main className="flex min-h-0 flex-1 flex-col px-4 py-6 sm:px-6">{children}</main>
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="flex min-h-0 flex-1 flex-col px-4 py-6 outline-none sm:px-6"
+            >
+              {children}
+            </main>
           </SidebarInset>
         </SidebarProvider>
       </RealtimeProvider>

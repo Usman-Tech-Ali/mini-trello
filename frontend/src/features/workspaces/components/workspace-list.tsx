@@ -21,7 +21,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceDto }) {
   return (
     <Link
       href={`/workspaces/${workspace.id}`}
-      className="group flex h-full flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="group flex h-full flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs transition-[translate,box-shadow] outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-[3px] focus-visible:ring-ring/50 motion-reduce:hover:translate-y-0"
     >
       <div className="flex items-start justify-between gap-3">
         <span
