@@ -29,7 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { TaskComments } from '@/features/comments/components/task-comments';
 import { useTypingSignal } from '@/features/realtime/hooks/use-typing-signal';
 import { describeEditors } from '@/features/realtime/lib/remote-updates';
 import { ApiError } from '@/lib/api/api-error';
@@ -111,6 +113,7 @@ export function TaskDialog({
   if (!task) return null;
 
   const creator = members.find((m) => m.userId === task.creatorId);
+  const membersById = new Map(members.map((member) => [member.userId, member]));
   const changedRemotely = !conflict && task.version !== formVersion;
   const close = () => {
     typingSignal.stop();
@@ -174,7 +177,7 @@ export function TaskDialog({
   return (
     <>
       <Dialog open onOpenChange={(open) => !open && close()}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
           <form onSubmit={(event) => void save(event)} noValidate>
             <DialogHeader>
               <DialogTitle>Edit task</DialogTitle>
@@ -325,6 +328,8 @@ export function TaskDialog({
               </div>
             </DialogFooter>
           </form>
+          <Separator />
+          <TaskComments taskId={task.id} membersById={membersById} />
         </DialogContent>
       </Dialog>
 
