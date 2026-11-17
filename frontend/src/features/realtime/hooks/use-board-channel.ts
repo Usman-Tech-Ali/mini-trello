@@ -4,7 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { activityKeys } from '@/features/activity/api/activity.keys';
+import { addActivity, type ActivityPages } from '@/features/activity/lib/activity-pages';
 import { boardKeys } from '@/features/boards/api/boards.keys';
+import { commentKeys } from '@/features/comments/api/comments.keys';
+import { addComment, type CommentPages } from '@/features/comments/lib/comment-pages';
 import { taskKeys } from '@/features/tasks/api/tasks.keys';
 import { workspaceKeys } from '@/features/workspaces/api/workspaces.keys';
 import { getSocket } from '@/lib/realtime/socket';
@@ -87,6 +91,18 @@ export function useBoardChannel(
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
       router.replace('/workspaces');
     };
+    const onComment = ({ boardId: eventBoardId, comment }: Payload<'comment:created'>) => {
+      if (eventBoardId !== boardId) return;
+      queryClient.setQueryData<CommentPages>(commentKeys.task(comment.taskId), (data) =>
+        addComment(data, comment),
+      );
+    };
+    const onActivity = (payload: Payload<'activity:created'>) => {
+      if (!forThisBoard(payload)) return;
+      queryClient.setQueryData<ActivityPages>(activityKeys.board(boardId), (data) =>
+        addActivity(data, payload.activity),
+      );
+    };
     const onPresence = (payload: Payload<'presence:update'>) => {
       if (forThisBoard(payload)) setOnlineUserIds(payload.userIds);
     };
@@ -102,6 +118,8 @@ export function useBoardChannel(
     socket.on('board:stale', onBoardStale);
     socket.on('board:deleted', onBoardDeleted);
     socket.on('board:access-revoked', onAccessRevoked);
+    socket.on('comment:created', onComment);
+    socket.on('activity:created', onActivity);
     socket.on('presence:update', onPresence);
     socket.on('typing:update', onTyping);
     if (socket.connected) join();
@@ -121,6 +139,8 @@ export function useBoardChannel(
       socket.off('board:stale', onBoardStale);
       socket.off('board:deleted', onBoardDeleted);
       socket.off('board:access-revoked', onAccessRevoked);
+      socket.off('comment:created', onComment);
+      socket.off('activity:created', onActivity);
       socket.off('presence:update', onPresence);
       socket.off('typing:update', onTyping);
     };

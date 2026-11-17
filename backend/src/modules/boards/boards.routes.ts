@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { requireAuth } from '../../middleware/require-auth';
 import { requireBoardAccess } from '../../middleware/require-board';
 import { requireWorkspaceMember } from '../../middleware/require-workspace';
+import * as activity from '../activity/activity.controller';
 import * as tasks from '../tasks/tasks.controller';
 import * as boards from './boards.controller';
 
@@ -24,3 +25,4 @@ boardsRouter.patch('/:boardId/columns/:columnId', requireBoardAccess, boards.upd
 boardsRouter.delete('/:boardId/columns/:columnId', requireBoardAccess, boards.removeColumn);
 boardsRouter.get('/:boardId/tasks', requireBoardAccess, tasks.listForBoard);
 boardsRouter.post('/:boardId/tasks', requireBoardAccess, tasks.create);
+boardsRouter.get('/:boardId/activity', requireBoardAccess, activity.listForBoard);

@@ -13,7 +13,7 @@ import type { Request, Response } from 'express';
 
 import { getAuthUserId, getMembership } from '../../lib/request-context';
 import { parseIdParam, parseInput } from '../../lib/validate';
-import { revokeWorkspaceAccess, emitToBoard } from '../../realtime/realtime-server';
+import { emitToBoard, emitToUser, revokeWorkspaceAccess } from '../../realtime/realtime-server';
 import { listBoards } from '../boards/boards.service';
 import { MEMBER_NOT_FOUND } from './workspace-access';
 import {
@@ -50,7 +50,10 @@ export async function addWorkspaceMember(
   res: Response<MemberResponse>,
 ): Promise<void> {
   const { email } = parseInput(addMemberSchema, req.body);
-  const member = await addMember(getMembership(req).workspaceId, email);
+  const { workspaceId } = getMembership(req);
+  const member = await addMember(workspaceId, email);
+  // The new member's open tabs show the workspace without a reload.
+  emitToUser(member.userId, 'workspaces:changed', { workspaceId });
   res.status(201).json({ member });
 }
 
@@ -58,7 +61,9 @@ export async function updateRole(req: Request, res: Response<MemberResponse>): P
   const { workspaceId, userId } = getMembership(req);
   const targetUserId = parseIdParam(req.params.userId, MEMBER_NOT_FOUND);
   const { role } = parseInput(updateMemberRoleSchema, req.body);
-  res.json({ member: await updateMemberRole(workspaceId, userId, targetUserId, role) });
+  const member = await updateMemberRole(workspaceId, userId, targetUserId, role);
+  emitToUser(targetUserId, 'workspaces:changed', { workspaceId });
+  res.json({ member });
 }
 
 export async function remove(req: Request, res: Response): Promise<void> {
@@ -68,6 +73,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
   // Live connections must not outlast membership: take the user out of the workspace's boards,
   // and tell everyone else to refresh tasks (the removed member's tasks were unassigned).
   revokeWorkspaceAccess(workspaceId, targetUserId);
+  emitToUser(targetUserId, 'workspaces:changed', { workspaceId });
   for (const board of await listBoards(workspaceId)) {
     emitToBoard(board.id, undefined, 'board:stale', { boardId: board.id });
   }

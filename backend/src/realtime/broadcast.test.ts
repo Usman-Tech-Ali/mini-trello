@@ -1,6 +1,7 @@
 import type {
   BoardDto,
   BoardResponse,
+  CommentResponse,
   TaskDto,
   TaskResponse,
   WorkspaceResponse,
@@ -178,5 +179,83 @@ describe('access revocation', () => {
 
     const rejoin = await joinBoard(bobSocket, board.id);
     expect(rejoin.ok).toBe(false);
+  });
+});
+
+describe('comment and activity broadcasts', () => {
+  it('sends a new comment to other members but not back to its author', async () => {
+    const task = await createTask('Discuss');
+    const bobGets = nextEvent(bobSocket, 'comment:created');
+    const aliceGets = receives(aliceSocket, 'comment:created');
+    const res = await aliceApi()
+      .post(`/api/tasks/${task.id}/comments`)
+      .send({ body: 'Thoughts?', requestId: newRequestId() })
+      .expect(201);
+
+    expect(await bobGets).toEqual({
+      boardId: board.id,
+      comment: (res.body as CommentResponse).comment,
+    });
+    expect(await aliceGets).toBe(false);
+  });
+
+  it('sends activity to everyone on the board, the actor included', async () => {
+    const aliceGets = nextEvent(aliceSocket, 'activity:created');
+    const bobGets = nextEvent(bobSocket, 'activity:created');
+    const task = await createTask('Tracked');
+
+    for (const payload of [await aliceGets, await bobGets]) {
+      expect(payload).toMatchObject({
+        boardId: board.id,
+        activity: { action: 'task.created', taskId: task.id, actorId: alice.user.id },
+      });
+    }
+  });
+
+  it('sends no activity when the write fails', async () => {
+    const task = await createTask('Contested');
+    await aliceApi().patch(`/api/tasks/${task.id}`).send({ version: 1, title: 'A' }).expect(200);
+
+    const broadcast = receives(bobSocket, 'activity:created');
+    await aliceApi().patch(`/api/tasks/${task.id}`).send({ version: 1, title: 'B' }).expect(409);
+    expect(await broadcast).toBe(false);
+  });
+});
+
+describe('personal workspace events', () => {
+  it('tells a user, on every open tab, when they are added, re-roled or removed', async () => {
+    const carol = await registerSessionUser(server.http, 'Carol');
+    const [tab1, tab2] = await Promise.all([
+      connectSocket(server.url, { cookie: carol.cookie }),
+      connectSocket(server.url, { cookie: carol.cookie }),
+    ]);
+    const api = restAs(server.http, alice);
+    try {
+      const added = Promise.all([
+        nextEvent(tab1, 'workspaces:changed'),
+        nextEvent(tab2, 'workspaces:changed'),
+      ]);
+      const bobHears = receives(bobSocket, 'workspaces:changed');
+      await api
+        .post(`/api/workspaces/${workspaceId}/members`)
+        .send({ email: carol.user.email })
+        .expect(201);
+      expect(await added).toEqual([{ workspaceId }, { workspaceId }]);
+      expect(await bobHears).toBe(false);
+
+      const promoted = nextEvent(tab1, 'workspaces:changed');
+      await api
+        .patch(`/api/workspaces/${workspaceId}/members/${carol.user.id}`)
+        .send({ role: 'admin' })
+        .expect(200);
+      expect(await promoted).toEqual({ workspaceId });
+
+      const removed = nextEvent(tab1, 'workspaces:changed');
+      await api.delete(`/api/workspaces/${workspaceId}/members/${carol.user.id}`).expect(204);
+      expect(await removed).toEqual({ workspaceId });
+    } finally {
+      tab1.close();
+      tab2.close();
+    }
   });
 });

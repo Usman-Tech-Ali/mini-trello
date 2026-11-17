@@ -4,6 +4,8 @@ import mongoose, { type Types } from 'mongoose';
 
 import { AppError } from '../../lib/app-error';
 import { isDuplicateKeyError } from '../../lib/mongo-errors';
+import { ActivityModel } from '../activity/activity.model';
+import { CommentModel } from '../comments/comment.model';
 import { TaskModel } from '../tasks/task.model';
 import { BOARD_NOT_FOUND, COLUMN_NOT_FOUND } from './board-access';
 import { BoardModel } from './board.model';
@@ -81,6 +83,8 @@ export async function renameBoard(boardId: string, name: string): Promise<BoardD
 export async function deleteBoard(boardId: string): Promise<void> {
   await mongoose.connection.transaction(async (session) => {
     await TaskModel.deleteMany({ boardId }, { session });
+    await CommentModel.deleteMany({ boardId }, { session });
+    await ActivityModel.deleteMany({ boardId }, { session });
     const result = await BoardModel.deleteOne({ _id: boardId }, { session });
     if (result.deletedCount === 0) throw new AppError(404, 'NOT_FOUND', BOARD_NOT_FOUND);
   });

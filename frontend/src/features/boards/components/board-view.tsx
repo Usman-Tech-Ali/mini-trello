@@ -3,7 +3,14 @@
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import type { BoardDto, MemberDto } from '@mini-trello/shared';
 import { createBoardSchema, createColumnSchema } from '@mini-trello/shared';
-import { EllipsisIcon, PencilIcon, PlusIcon, SearchXIcon, Trash2Icon } from 'lucide-react';
+import {
+  EllipsisIcon,
+  HistoryIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchXIcon,
+  Trash2Icon,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -21,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityPanel } from '@/features/activity/components/activity-panel';
 import { useCurrentUser } from '@/features/auth/hooks/use-session';
 import { PresenceAvatars } from '@/features/realtime/components/presence-avatars';
 import { useBoardChannel } from '@/features/realtime/hooks/use-board-channel';
@@ -85,6 +93,7 @@ function Board({ board }: { board: BoardDto }) {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [pendingTaskIds, setPendingTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<'rename' | 'add-column' | 'delete' | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
   const currentUser = useCurrentUser();
   const { onlineUserIds, typing } = useBoardChannel(board, {
     onTaskDeleted: (taskId) => {
@@ -109,6 +118,10 @@ function Board({ board }: { board: BoardDto }) {
     [tasksByColumn],
   );
   const openTask = tasksQuery.data?.find((task) => task.id === openTaskId) ?? null;
+  const taskIds = useMemo(
+    () => new Set((tasksQuery.data ?? []).map((task) => task.id)),
+    [tasksQuery.data],
+  );
   // Names of other people currently editing each task (live typing indicators).
   const editorsByTask = useMemo(() => {
     const result = new Map<string, string[]>();
@@ -178,6 +191,10 @@ function Board({ board }: { board: BoardDto }) {
             membersById={membersById}
             currentUserId={currentUser.id}
           />
+          <Button variant="outline" size="sm" onClick={() => setActivityOpen(true)}>
+            <HistoryIcon aria-hidden="true" />
+            Activity
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setDialog('add-column')}>
             <PlusIcon aria-hidden="true" />
             Add column
@@ -249,6 +266,14 @@ function Board({ board }: { board: BoardDto }) {
         columnSizes={columnSizes}
         editors={openTask ? (editorsByTask.get(openTask.id) ?? []) : []}
         onClose={() => setOpenTaskId(null)}
+      />
+      <ActivityPanel
+        boardId={board.id}
+        open={activityOpen}
+        onOpenChange={setActivityOpen}
+        membersById={membersById}
+        onOpenTask={setOpenTaskId}
+        existingTaskIds={taskIds}
       />
       <NameDialog
         open={dialog === 'add-column'}
