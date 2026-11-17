@@ -15,7 +15,12 @@ import {
   getTaskAccess,
 } from '../../lib/request-context';
 import { parseInput } from '../../lib/validate';
-import { emitActivity, emitNotifications, emitToBoard } from '../../realtime/realtime-server';
+import {
+  emitActivity,
+  emitNotifications,
+  emitToBoard,
+  emitToUser,
+} from '../../realtime/realtime-server';
 import {
   createTask,
   deleteTask,
@@ -80,9 +85,10 @@ export async function move(req: Request, res: Response<TaskResponse>): Promise<v
 export async function remove(req: Request, res: Response): Promise<void> {
   const access = getTaskAccess(req);
   const { boardId, taskId } = access;
-  const activities = await deleteTask(access, getAuthUserId(req));
+  const { activities, notifiedUserIds } = await deleteTask(access, getAuthUserId(req));
   emitToBoard(boardId, getOriginSocketId(req), 'task:deleted', { boardId, taskId });
   emitActivity(activities);
+  for (const userId of notifiedUserIds) emitToUser(userId, 'notifications:changed');
   res.status(204).end();
 }
 

@@ -33,7 +33,7 @@ import { ActivityPanel } from '@/features/activity/components/activity-panel';
 import { useCurrentUser } from '@/features/auth/hooks/use-session';
 import { PresenceAvatars } from '@/features/realtime/components/presence-avatars';
 import { useBoardChannel } from '@/features/realtime/hooks/use-board-channel';
-import { typingUsers } from '@/features/realtime/lib/remote-updates';
+import { typingTaskIds, typingUsers } from '@/features/realtime/lib/remote-updates';
 import { TaskDialog } from '@/features/tasks/components/task-dialog';
 import { useBoardTasks, useMoveTask } from '@/features/tasks/hooks/use-tasks';
 import { groupTasksByColumn, toColumnIndex } from '@/features/tasks/lib/task-order';
@@ -146,16 +146,19 @@ function Board({ board }: { board: BoardDto }) {
     () => new Set((tasksQuery.data ?? []).map((task) => task.id)),
     [tasksQuery.data],
   );
-  // Names of other people currently editing each task (live typing indicators).
-  const editorsByTask = useMemo(() => {
-    const result = new Map<string, string[]>();
-    for (const taskId of typing.keys()) {
-      const names = typingUsers(typing, taskId)
-        .filter((userId) => userId !== currentUser.id)
-        .flatMap((userId) => membersById.get(userId)?.name ?? []);
-      if (names.length > 0) result.set(taskId, names);
-    }
-    return result;
+  // Names of other people currently typing, per task: in its fields, or in a comment on it.
+  const [editorsByTask, commentersByTask] = useMemo(() => {
+    const namesByTask = (target: 'task' | 'comment') => {
+      const result = new Map<string, string[]>();
+      for (const taskId of typingTaskIds(typing, target)) {
+        const names = typingUsers(typing, taskId, target)
+          .filter((userId) => userId !== currentUser.id)
+          .flatMap((userId) => membersById.get(userId)?.name ?? []);
+        if (names.length > 0) result.set(taskId, names);
+      }
+      return result;
+    };
+    return [namesByTask('task'), namesByTask('comment')];
   }, [typing, membersById, currentUser.id]);
 
   const onDragEnd = ({ draggableId, source, destination }: DropResult) => {
@@ -318,6 +321,7 @@ function Board({ board }: { board: BoardDto }) {
         members={members}
         columnSizes={columnSizes}
         editors={openTask ? (editorsByTask.get(openTask.id) ?? []) : []}
+        commenters={openTask ? (commentersByTask.get(openTask.id) ?? []) : []}
         onClose={() => setOpenTaskId(null)}
       />
       <ActivityPanel

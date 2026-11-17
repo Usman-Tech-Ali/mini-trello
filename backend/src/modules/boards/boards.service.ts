@@ -7,7 +7,7 @@ import { isDuplicateKeyError } from '../../lib/mongo-errors';
 import { ActivityModel } from '../activity/activity.model';
 import { CommentModel } from '../comments/comment.model';
 import { TaskRevisionModel } from '../history/task-revision.model';
-import { NotificationModel } from '../notifications/notification.model';
+import { removeTaskNotifications } from '../notifications/notifications.service';
 import { TaskModel } from '../tasks/task.model';
 import { BOARD_NOT_FOUND, COLUMN_NOT_FOUND } from './board-access';
 import { BoardModel } from './board.model';
@@ -82,15 +82,17 @@ export async function renameBoard(boardId: string, name: string): Promise<BoardD
 }
 
 /** Deletes the board and all of its tasks atomically. */
-export async function deleteBoard(boardId: string): Promise<void> {
-  await mongoose.connection.transaction(async (session) => {
+/** Deletes the board with everything in it; returns users whose notifications were removed. */
+export async function deleteBoard(boardId: string): Promise<string[]> {
+  return mongoose.connection.transaction(async (session) => {
     await TaskModel.deleteMany({ boardId }, { session });
     await CommentModel.deleteMany({ boardId }, { session });
     await ActivityModel.deleteMany({ boardId }, { session });
-    await NotificationModel.deleteMany({ boardId }, { session });
+    const notifiedUserIds = await removeTaskNotifications({ boardId }, session);
     await TaskRevisionModel.deleteMany({ boardId }, { session });
     const result = await BoardModel.deleteOne({ _id: boardId }, { session });
     if (result.deletedCount === 0) throw new AppError(404, 'NOT_FOUND', BOARD_NOT_FOUND);
+    return notifiedUserIds;
   });
 }
 

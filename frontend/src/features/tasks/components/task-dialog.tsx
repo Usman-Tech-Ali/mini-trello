@@ -79,6 +79,8 @@ interface TaskDialogProps {
   columnSizes: Map<string, number>;
   /** Names of other people editing this task right now. */
   editors: string[];
+  /** Names of other people writing a comment on this task right now. */
+  commenters: string[];
   onClose: () => void;
 }
 
@@ -88,6 +90,7 @@ export function TaskDialog({
   members,
   columnSizes,
   editors,
+  commenters,
   onClose,
 }: TaskDialogProps) {
   const updateTask = useUpdateTask(board.id);
@@ -380,6 +383,8 @@ export function TaskDialog({
             <>
               <Separator />
               <TaskComments
+                boardId={board.id}
+                commenters={commenters}
                 taskId={task.id}
                 membersById={membersById}
                 currentUserId={currentUser.id}

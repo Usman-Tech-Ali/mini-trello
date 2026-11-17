@@ -1,3 +1,4 @@
+import type { TypingTarget } from '@mini-trello/shared';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { getSocket } from '@/lib/realtime/socket';
@@ -6,11 +7,16 @@ const RESEND_MS = 2_000;
 const IDLE_MS = 3_000;
 
 /**
- * Tells others on the board that the user is editing a task. Call `onActivity` on each keystroke:
+ * Tells others on the board that the user is editing a task (`target: 'task'`) or writing a
+ * comment on it (`target: 'comment'`). Call `onActivity` on each keystroke:
  * a start signal is sent at most every 2 s, and a stop signal after 3 s idle, on `stop()`, or on
  * unmount. (Receivers also expire indicators on their own.)
  */
-export function useTypingSignal(boardId: string, taskId: string | undefined) {
+export function useTypingSignal(
+  boardId: string,
+  taskId: string | undefined,
+  target: TypingTarget = 'task',
+) {
   const lastSentAt = useRef(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const active = useRef(false);
@@ -20,20 +26,20 @@ export function useTypingSignal(boardId: string, taskId: string | undefined) {
     if (!active.current || !taskId) return;
     active.current = false;
     lastSentAt.current = 0;
-    getSocket().emit('typing:stop', { boardId, taskId });
-  }, [boardId, taskId]);
+    getSocket().emit('typing:stop', { boardId, taskId, target });
+  }, [boardId, taskId, target]);
 
   const onActivity = useCallback(() => {
     if (!taskId) return;
     const now = Date.now();
     if (now - lastSentAt.current > RESEND_MS) {
-      getSocket().emit('typing:start', { boardId, taskId });
+      getSocket().emit('typing:start', { boardId, taskId, target });
       lastSentAt.current = now;
       active.current = true;
     }
     clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(stop, IDLE_MS);
-  }, [boardId, taskId, stop]);
+  }, [boardId, taskId, target, stop]);
 
   useEffect(() => stop, [stop]);
 

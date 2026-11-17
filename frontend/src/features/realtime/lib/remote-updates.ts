@@ -1,4 +1,4 @@
-import type { TaskDto } from '@mini-trello/shared';
+import type { TaskDto, TypingTarget } from '@mini-trello/shared';
 
 /**
  * Applies a task received over the socket. Events can arrive late or out of order (e.g. after a
@@ -18,20 +18,23 @@ export function removeRemoteTask(tasks: readonly TaskDto[], taskId: string): Tas
 /** Typing indicators expire on their own, so a lost "stopped typing" event can't leave one stuck. */
 export const TYPING_TTL_MS = 5_000;
 
-/** taskId → userId → expiry timestamp (ms). */
+/** `taskId|target` → userId → expiry timestamp (ms). */
 export type TypingState = ReadonlyMap<string, ReadonlyMap<string, number>>;
+
+const stateKey = (taskId: string, target: TypingTarget) => `${taskId}|${target}`;
 
 export function applyTyping(
   state: TypingState,
-  update: { taskId: string; userId: string; isTyping: boolean },
+  update: { taskId: string; target: TypingTarget; userId: string; isTyping: boolean },
   now: number,
 ): TypingState {
+  const key = stateKey(update.taskId, update.target);
   const next = new Map(state);
-  const users = new Map(next.get(update.taskId));
+  const users = new Map(next.get(key));
   if (update.isTyping) users.set(update.userId, now + TYPING_TTL_MS);
   else users.delete(update.userId);
-  if (users.size > 0) next.set(update.taskId, users);
-  else next.delete(update.taskId);
+  if (users.size > 0) next.set(key, users);
+  else next.delete(key);
   return next;
 }
 
@@ -47,8 +50,30 @@ export function pruneTyping(state: TypingState, now: number): TypingState {
   return changed ? next : state;
 }
 
-export function typingUsers(state: TypingState, taskId: string): string[] {
-  return [...(state.get(taskId)?.keys() ?? [])];
+/** Who is typing in `target` (task fields or a comment) of a task. */
+export function typingUsers(
+  state: TypingState,
+  taskId: string,
+  target: TypingTarget = 'task',
+): string[] {
+  return [...(state.get(stateKey(taskId, target))?.keys() ?? [])];
+}
+
+/** Tasks that currently have someone typing in `target`. */
+export function typingTaskIds(state: TypingState, target: TypingTarget): string[] {
+  return [...state.keys()].flatMap((key) => {
+    const [taskId, keyTarget] = key.split('|');
+    return taskId && keyTarget === target ? [taskId] : [];
+  });
+}
+
+/** "Sara is writing a comment", "Sara and Ali are writing comments", … */
+export function describeCommenters(names: readonly string[]): string {
+  const [first, second] = names;
+  if (!first) return '';
+  if (names.length === 1) return `${first} is writing a comment`;
+  if (names.length === 2) return `${first} and ${second ?? ''} are writing comments`;
+  return `${first} and ${names.length - 1} others are writing comments`;
 }
 
 /** "Sara is editing", "Sara and Ali are editing", "Sara and 2 others are editing". */

@@ -88,6 +88,19 @@ export async function createNotifications(
   }));
 }
 
+/**
+ * Deletes notifications about deleted tasks or boards (their links would lead nowhere) and returns
+ * the affected recipients, so their open inboxes can be refreshed after the transaction commits.
+ */
+export async function removeTaskNotifications(
+  filter: { taskId: string } | { boardId: string },
+  session: ClientSession,
+): Promise<string[]> {
+  const recipients = await NotificationModel.distinct('userId', filter).session(session);
+  await NotificationModel.deleteMany(filter, { session });
+  return recipients.map((id) => id.toString());
+}
+
 export function countUnread(userId: string): Promise<number> {
   return NotificationModel.countDocuments({ userId, readAt: null });
 }

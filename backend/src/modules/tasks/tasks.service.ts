@@ -21,6 +21,7 @@ import { findRevision, recordRevision } from '../history/history.service';
 import { TaskRevisionModel } from '../history/task-revision.model';
 import {
   createNotifications,
+  removeTaskNotifications,
   type NewNotification,
   type SentNotification,
 } from '../notifications/notifications.service';
@@ -411,16 +412,25 @@ export async function moveTask(
 }
 
 /** Deletes the task and its comments; the activity log keeps a record of it. */
-export async function deleteTask(access: TaskAccess, actorId: string): Promise<ActivityDto[]> {
+export interface DeletedTask {
+  activities: ActivityDto[];
+  /** People whose notifications about this task were removed (their inbox changed). */
+  notifiedUserIds: string[];
+}
+
+export async function deleteTask(access: TaskAccess, actorId: string): Promise<DeletedTask> {
   return mongoose.connection.transaction(async (session) => {
     const task = await TaskModel.findOneAndDelete({ _id: access.taskId }, { session }).lean();
     if (!task) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
     await CommentModel.deleteMany({ taskId: access.taskId }, { session });
     await TaskRevisionModel.deleteMany({ taskId: access.taskId }, { session });
-    return recordActivities(
+    // Notifications would otherwise link to a task that no longer exists.
+    const notifiedUserIds = await removeTaskNotifications({ taskId: access.taskId }, session);
+    const activities = await recordActivities(
       [{ ...activityFor(access, actorId, task), action: 'task.deleted' }],
       session,
     );
+    return { activities, notifiedUserIds };
   });
 }
 

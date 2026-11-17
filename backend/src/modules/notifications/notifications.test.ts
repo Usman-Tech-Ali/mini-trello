@@ -262,6 +262,15 @@ describe('reading notifications', () => {
     await outsider.client.get('/api/notifications').expect(401);
   });
 
+  it('removes notifications together with their task, so no link leads to a deleted task', async () => {
+    const task = await createTask(admin, board.id, column(), { assigneeId: sara.user.id });
+    expect((await inbox(sara)).unreadCount).toBe(1);
+    await admin.client.delete(`/api/tasks/${task.id}`).expect(204);
+    const { notifications, unreadCount } = await inbox(sara);
+    expect(notifications).toHaveLength(0);
+    expect(unreadCount).toBe(0);
+  });
+
   it('removes notifications together with their board', async () => {
     await notifySara(1);
     await admin.client.delete(`/api/boards/${board.id}`).expect(204);
