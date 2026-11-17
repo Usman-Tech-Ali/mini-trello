@@ -32,6 +32,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { TaskComments } from '@/features/comments/components/task-comments';
+import { useCurrentUser } from '@/features/auth/hooks/use-session';
 import { useTypingSignal } from '@/features/realtime/hooks/use-typing-signal';
 import { describeEditors } from '@/features/realtime/lib/remote-updates';
 import { ApiError } from '@/lib/api/api-error';
@@ -90,6 +91,7 @@ export function TaskDialog({
   const updateTask = useUpdateTask(board.id);
   const moveTask = useMoveTask(board.id);
   const deleteTask = useDeleteTask(board.id);
+  const currentUser = useCurrentUser();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [conflict, setConflict] = useState(false);
@@ -183,7 +185,14 @@ export function TaskDialog({
   return (
     <>
       <Dialog open onOpenChange={(open) => !open && requestClose()}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto overscroll-contain sm:max-w-2xl">
+        <DialogContent
+          className="max-h-[90dvh] overflow-y-auto overscroll-contain sm:max-w-2xl"
+          onEscapeKeyDown={(event) => {
+            // Escape in the comment box first closes its @mention list, not the whole dialog.
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && active.dataset.suggesting) event.preventDefault();
+          }}
+        >
           <form onSubmit={(event) => void save(event)} noValidate>
             <DialogHeader>
               <DialogTitle>Edit task</DialogTitle>
@@ -336,7 +345,7 @@ export function TaskDialog({
             </DialogFooter>
           </form>
           <Separator />
-          <TaskComments taskId={task.id} membersById={membersById} />
+          <TaskComments taskId={task.id} membersById={membersById} currentUserId={currentUser.id} />
         </DialogContent>
       </Dialog>
 

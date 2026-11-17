@@ -12,16 +12,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { UserAvatar } from '@/components/user-avatar';
 import { formatRelative } from '@/lib/dates';
+import { cn } from '@/lib/utils';
 
 import { useCreateComment, useTaskComments } from '../hooks/use-comments';
 import { flattenComments } from '../lib/comment-pages';
+import {
+  activeMentionQuery,
+  insertMention,
+  matchMembers,
+  splitMentions,
+  type MentionQuery,
+} from '../lib/mentions';
 
 interface TaskCommentsProps {
   taskId: string;
   membersById: Map<string, MemberDto>;
+  currentUserId: string;
 }
 
-export function TaskComments({ taskId, membersById }: TaskCommentsProps) {
+export function TaskComments({ taskId, membersById, currentUserId }: TaskCommentsProps) {
   const commentsQuery = useTaskComments(taskId);
   const comments = flattenComments(commentsQuery.data);
 
@@ -82,7 +91,10 @@ export function TaskComments({ taskId, membersById }: TaskCommentsProps) {
                           {formatRelative(comment.createdAt)}
                         </time>
                       </p>
-                      <p className="text-sm break-words whitespace-pre-wrap">{comment.body}</p>
+                      <CommentBody
+                        body={comment.body}
+                        names={comment.mentionIds.flatMap((id) => membersById.get(id)?.name ?? [])}
+                      />
                     </div>
                   </li>
                 );
@@ -92,17 +104,56 @@ export function TaskComments({ taskId, membersById }: TaskCommentsProps) {
         </>
       )}
 
-      <CommentComposer taskId={taskId} />
+      <CommentComposer
+        taskId={taskId}
+        mentionable={[...membersById.values()].filter((m) => m.userId !== currentUserId)}
+      />
     </section>
   );
 }
 
-function CommentComposer({ taskId }: { taskId: string }) {
+interface CommentComposerProps {
+  taskId: string;
+  /** People who can be @mentioned (the author is excluded). */
+  mentionable: MemberDto[];
+}
+
+function CommentComposer({ taskId, mentionable }: CommentComposerProps) {
   const createComment = useCreateComment(taskId);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | undefined>();
   // One id per comment, reused if the same comment is retried, so the server can dedupe it.
   const requestId = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Picked from the list: userId → name. Only those whose "@Name" survives in the text count.
+  const [picked, setPicked] = useState<ReadonlyMap<string, string>>(new Map());
+  const [mention, setMention] = useState<MentionQuery | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const suggestions = mention ? matchMembers(mentionable, mention.query) : [];
+  const suggesting = suggestions.length > 0;
+  const listId = `mention-list-${taskId}`;
+  const optionId = (index: number) => `${listId}-${index}`;
+
+  const updateMention = (text: string, caret: number) => {
+    setMention(activeMentionQuery(text, caret));
+    setActiveIndex(0);
+  };
+
+  const choose = (member: MemberDto) => {
+    const textarea = textareaRef.current;
+    if (!mention || !textarea) return;
+    const next = insertMention(body, mention, textarea.selectionStart, member.name);
+    setBody(next.text);
+    setPicked((current) => new Map(current).set(member.userId, member.name));
+    setMention(null);
+    requestId.current = null;
+    // Restore the caret after React re-renders the new text.
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(next.caret, next.caret);
+    });
+  };
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
@@ -111,12 +162,16 @@ function CommentComposer({ taskId }: { taskId: string }) {
       setError(parsed.error.issues[0]?.message);
       return;
     }
+    const mentionIds = [...picked]
+      .filter(([, name]) => parsed.data.includes(`@${name}`))
+      .map(([userId]) => userId);
     requestId.current ??= crypto.randomUUID();
     createComment.mutate(
-      { body: parsed.data, requestId: requestId.current },
+      { body: parsed.data, mentionIds, requestId: requestId.current },
       {
         onSuccess: () => {
           setBody('');
+          setPicked(new Map());
           setError(undefined);
           requestId.current = null;
         },
@@ -126,29 +181,90 @@ function CommentComposer({ taskId }: { taskId: string }) {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggesting) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        setActiveIndex((index) => (index + step + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        const member = suggestions[activeIndex];
+        if (member) choose(member);
+        return;
+      }
+      if (event.key === 'Escape') {
+        // The task dialog checks data-suggesting, so Escape closes only the list.
+        setMention(null);
+        return;
+      }
+    }
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submit();
   };
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-2">
-      <Field data-invalid={!!error}>
+      <Field data-invalid={!!error} className="relative">
         <FieldLabel htmlFor={`comment-${taskId}`} className="sr-only">
           Add a comment
         </FieldLabel>
         <Textarea
+          ref={textareaRef}
           id={`comment-${taskId}`}
           rows={2}
-          placeholder="Write a comment…"
+          placeholder="Write a comment… Type @ to mention someone"
           value={body}
           onChange={(event) => {
             setBody(event.target.value);
+            updateMention(event.target.value, event.target.selectionStart);
             // Edited text is a different comment: it needs a new request id.
             requestId.current = null;
           }}
+          onSelect={(event) =>
+            updateMention(event.currentTarget.value, event.currentTarget.selectionStart)
+          }
+          onBlur={() => setMention(null)}
           onKeyDown={onKeyDown}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={suggesting}
+          aria-controls={listId}
+          aria-activedescendant={suggesting ? optionId(activeIndex) : undefined}
+          data-suggesting={suggesting || undefined}
           aria-invalid={!!error}
           aria-describedby={error ? `comment-${taskId}-error` : undefined}
         />
+        {suggesting && (
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label="People to mention"
+            className="absolute top-full left-0 z-10 mt-1 w-64 overflow-hidden rounded-md border bg-popover p-1 shadow-md"
+          >
+            {suggestions.map((member, index) => (
+              <li
+                key={member.userId}
+                id={optionId(index)}
+                role="option"
+                aria-selected={index === activeIndex}
+                // Keep focus in the textarea; choose on press, before blur closes the list.
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  choose(member);
+                }}
+                onMouseEnter={() => setActiveIndex(index)}
+                className={cn(
+                  'flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm',
+                  index === activeIndex && 'bg-accent text-accent-foreground',
+                )}
+              >
+                <UserAvatar name={member.name} className="size-5 text-[10px]" />
+                <span className="truncate">{member.name}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <FieldError id={`comment-${taskId}-error`} errors={error ? [{ message: error }] : []} />
       </Field>
       <div className="flex items-center justify-between gap-2">
@@ -158,5 +274,21 @@ function CommentComposer({ taskId }: { taskId: string }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function CommentBody({ body, names }: { body: string; names: string[] }) {
+  return (
+    <p className="text-sm break-words whitespace-pre-wrap">
+      {splitMentions(body, names).map((segment, index) =>
+        segment.mention ? (
+          <span key={index} className="font-medium text-primary">
+            {segment.text}
+          </span>
+        ) : (
+          segment.text
+        ),
+      )}
+    </p>
   );
 }

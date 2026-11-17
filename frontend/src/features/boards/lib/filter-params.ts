@@ -18,10 +18,10 @@ export function parseFilterParams(params: Pick<URLSearchParams, 'get'>): TaskFil
   return filters;
 }
 
-/** The query string after applying `patch` (undefined or "" removes a filter); keeps other params. */
+/** The query string after applying `patch` (undefined or "" removes a param); keeps the others. */
 export function applyFilterPatch(
   params: Pick<URLSearchParams, 'toString'>,
-  patch: FilterPatch,
+  patch: Readonly<Record<string, string | undefined>>,
 ): string {
   const next = new URLSearchParams(params.toString());
   for (const [key, value] of Object.entries(patch)) {
