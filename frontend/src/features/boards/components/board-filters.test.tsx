@@ -41,11 +41,13 @@ afterEach(() => {
 });
 
 describe('BoardFilters', () => {
-  it('searches after a short pause, with trimmed text', () => {
+  it('searches after a short pause, with trimmed text', async () => {
     const { onChange, search } = setup();
     fireEvent.change(search, { target: { value: '  login ' } });
     expect(onChange).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(300));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
     expect(onChange).toHaveBeenCalledWith({ q: 'login' });
   });
 
