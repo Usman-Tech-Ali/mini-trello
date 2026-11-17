@@ -48,10 +48,10 @@ const columns: { title: string; count: number; cards: PreviewCard[] }[] = [
 
 // Earthy avatar colours matching the workspace/board swatches.
 const avatarColors: Record<string, string> = {
-  UA: 'bg-[oklch(0.58_0.14_40)] text-white',
-  SK: 'bg-[oklch(0.55_0.07_155)] text-white',
-  AR: 'bg-[oklch(0.6_0.12_75)] text-white',
-  ZK: 'bg-[oklch(0.55_0.13_15)] text-white',
+  UA: 'bg-[#1f5a45] text-white',
+  SK: 'bg-[#3f6f8f] text-white',
+  AR: 'bg-[#8a6a1f] text-white',
+  ZK: 'bg-[#9c3b2f] text-white',
 };
 
 const highlights = [
@@ -128,10 +128,10 @@ function Card({ card }: { card: PreviewCard }) {
 /** Decorative product preview shown beside the sign-in and sign-up forms on large screens. */
 export function AuthShowcase() {
   return (
-    <aside className="relative hidden overflow-hidden bg-[oklch(0.2_0.012_60)] p-10 text-[oklch(0.96_0.006_80)] lg:flex lg:flex-col lg:justify-between xl:p-14">
+    <aside className="relative hidden overflow-hidden bg-[#123a2d] p-10 text-[#e6efea] lg:flex lg:flex-col lg:justify-between xl:p-14">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[radial-gradient(oklch(1_0_0/0.07)_1px,transparent_1px)] bg-size-[24px_24px]"
+        className="absolute inset-0 bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1px)] bg-size-[24px_24px]"
       />
 
       <div className="relative flex items-center gap-2.5 text-lg font-semibold">
@@ -147,7 +147,7 @@ export function AuthShowcase() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Product launch</p>
-              <p className="text-[11px] text-muted-foreground">Q4 roadmap · 13 tasks</p>
+              <p className="text-[11px] text-muted-foreground">13 tasks</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex -space-x-1.5">
@@ -197,10 +197,10 @@ export function AuthShowcase() {
       </div>
 
       <div className="relative space-y-5">
-        <h2 className="max-w-md font-display text-4xl leading-[1.05] tracking-tight xl:text-5xl">
-          Plan, track and ship together, <em className="text-brand">in real time.</em>
+        <h2 className="max-w-md text-3xl leading-tight font-semibold tracking-tight text-balance xl:text-4xl">
+          Plan, track and ship together, in real time.
         </h2>
-        <p className="max-w-md text-[oklch(0.96_0.006_80/0.7)]">
+        <p className="max-w-md text-[#e6efea]/75">
           Boards your whole team can work on at once. Every change appears instantly for everyone.
         </p>
         <ul className="flex flex-wrap gap-2">

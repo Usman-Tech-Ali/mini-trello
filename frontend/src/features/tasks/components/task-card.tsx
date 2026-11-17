@@ -27,9 +27,10 @@ export function TaskCard({ task, assignee, isDragging = false, editors = [] }: T
   return (
     <div
       className={cn(
-        'group space-y-2.5 rounded-lg border bg-card p-3 text-left shadow-xs transition-[box-shadow,border-color]',
-        'hover:border-primary/40 hover:shadow-sm',
-        isDragging && 'rotate-1 border-primary/50 shadow-lg',
+        'group space-y-2.5 rounded-md border bg-card p-3 text-left transition-[border-color,box-shadow]',
+        'hover:border-primary/50',
+        // The board's only shadow: a card lifted while it is being dragged.
+        isDragging && 'border-primary/60 shadow-lg',
       )}
     >
       <div className="flex items-start justify-between gap-2">

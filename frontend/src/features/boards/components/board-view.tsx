@@ -53,7 +53,7 @@ function BoardSkeleton() {
       <Skeleton className="h-9 w-64" />
       <div className="flex gap-4 overflow-hidden">
         {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-96 w-72 shrink-0 rounded-xl" />
+          <Skeleton key={i} className="h-96 w-72 shrink-0 rounded-lg" />
         ))}
       </div>
     </div>
@@ -206,7 +206,9 @@ function Board({ board }: { board: BoardDto }) {
             {initialOf(board.name)}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate font-display text-3xl tracking-tight">{board.name}</h1>
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+              {board.name}
+            </h1>
             <p className="text-sm text-muted-foreground tabular-nums">
               {board.columns.length === 1 ? '1 column' : `${board.columns.length} columns`}
             </p>
@@ -292,7 +294,7 @@ function Board({ board }: { board: BoardDto }) {
               <button
                 type="button"
                 onClick={() => setDialog('add-column')}
-                className="flex h-24 w-72 shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="flex h-24 w-72 shrink-0 items-center justify-center gap-2 rounded-lg border-2 border-dashed text-sm font-medium text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <PlusIcon className="size-4" aria-hidden="true" />
                 Add column

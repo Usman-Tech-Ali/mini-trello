@@ -67,7 +67,7 @@ export function WorkspaceDetail({ workspaceId }: { workspaceId: string }) {
         </span>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate font-display text-3xl tracking-tight sm:text-4xl">
+            <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
               {workspace.name}
             </h1>
             <Badge variant={workspace.role === 'admin' ? 'default' : 'secondary'}>

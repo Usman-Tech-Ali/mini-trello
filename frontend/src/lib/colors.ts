@@ -1,17 +1,17 @@
 /**
- * Stable identity colour for a workspace or board, derived from its id. Flat, earthy tones that
- * sit with the warm-neutral palette (no gradients, no blue/purple). All keep white initials
- * readable at the sizes used (≥ 3:1).
+ * Stable identity colour for a workspace or board, derived from its id. Muted, ink-like tones
+ * that sit with the pine-and-graphite palette (no gradients). All keep white initials readable
+ * at the sizes used (≥ 4.5:1).
  */
 const SWATCHES = [
-  'bg-[oklch(0.58_0.14_40)]', // clay
-  'bg-[oklch(0.6_0.12_75)]', // ochre
-  'bg-[oklch(0.55_0.1_120)]', // olive
-  'bg-[oklch(0.55_0.07_155)]', // sage
-  'bg-[oklch(0.45_0.08_155)]', // forest
-  'bg-[oklch(0.55_0.13_15)]', // rose
-  'bg-[oklch(0.48_0.06_55)]', // walnut
-  'bg-[oklch(0.32_0.01_60)]', // charcoal
+  'bg-[#1f5a45]', // pine
+  'bg-[#3f6f8f]', // steel
+  'bg-[#8a6a1f]', // ochre
+  'bg-[#9c3b2f]', // brick
+  'bg-[#5b4f8a]', // slate violet
+  'bg-[#2f6b6b]', // teal
+  'bg-[#6b5a48]', // walnut
+  'bg-[#2c3330]', // graphite
 ] as const;
 
 function hash(value: string): number {

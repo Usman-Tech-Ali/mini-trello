@@ -69,7 +69,7 @@ export function BoardColumn({
   return (
     <section
       aria-label={`${column.name} column`}
-      className="flex max-h-full w-72 shrink-0 flex-col rounded-xl border bg-muted/60"
+      className="flex max-h-full w-72 shrink-0 flex-col rounded-lg bg-muted/70"
     >
       <header className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
         <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
