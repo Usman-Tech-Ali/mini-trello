@@ -1,7 +1,7 @@
 import type { ActivityDto } from '@mini-trello/shared';
 import { describe, expect, it } from 'vitest';
 
-import { addActivity, type ActivityPages } from './activity-pages';
+import { addActivity, toActivityFilters, type ActivityPages } from './activity-pages';
 import { describeActivity, listOf } from './describe-activity';
 
 function activity(overrides: Partial<ActivityDto>): ActivityDto {
@@ -77,5 +77,27 @@ describe('addActivity', () => {
   it('ignores an entry it already has, and a feed that is not loaded', () => {
     expect(addActivity(feed, activity({ id: 'a1' }))).toBe(feed);
     expect(addActivity(undefined, activity({ id: 'a3' }))).toBeUndefined();
+  });
+});
+
+describe('toActivityFilters', () => {
+  it('turns local calendar days into an inclusive day range', () => {
+    const filters = toActivityFilters({
+      actor: 'u1',
+      action: 'task.moved',
+      fromDate: '2026-11-10',
+      toDate: '2026-11-12',
+    });
+    expect(filters).toEqual({
+      actor: 'u1',
+      action: 'task.moved',
+      from: new Date(2026, 10, 10).toISOString(),
+      // The whole last day is included: up to the start of the next day.
+      to: new Date(2026, 10, 13).toISOString(),
+    });
+  });
+
+  it('leaves out unset filters', () => {
+    expect(toActivityFilters({})).toEqual({});
   });
 });
