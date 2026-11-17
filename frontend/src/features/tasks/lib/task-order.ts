@@ -32,3 +32,22 @@ export function applyMove(
     ) ?? (siblings[index - 1]?.position ?? 0) + POSITION_STEP / 2;
   return tasks.map((task) => (task.id === taskId ? { ...task, columnId, position } : task));
 }
+
+/**
+ * Converts a drop index in a filtered column (only matching tasks shown) into the index among
+ * all of the column's tasks, which is what the API expects. The task lands just before the
+ * visible task it was dropped above, or just after the last visible one.
+ */
+export function toColumnIndex(
+  columnTasks: readonly TaskDto[],
+  visibleTasks: readonly TaskDto[],
+  taskId: string,
+  visibleIndex: number,
+): number {
+  const all = columnTasks.filter((task) => task.id !== taskId);
+  const visible = visibleTasks.filter((task) => task.id !== taskId);
+  const before = visible[visibleIndex];
+  if (before) return all.findIndex((task) => task.id === before.id);
+  const last = visible.at(-1);
+  return last ? all.findIndex((task) => task.id === last.id) + 1 : all.length;
+}

@@ -25,7 +25,11 @@ import { useDeleteColumn, useRenameColumn } from '../hooks/use-boards';
 interface BoardColumnProps {
   boardId: string;
   column: ColumnDto;
+  /** The tasks to show (only those matching the board's filters, when filtering). */
   tasks: TaskDto[];
+  /** All of the column's tasks, matching or not. */
+  totalCount: number;
+  isFiltered: boolean;
   membersById: Map<string, MemberDto>;
   pendingTaskIds: ReadonlySet<string>;
   /** taskId → names of others editing it right now. */
@@ -37,6 +41,8 @@ export function BoardColumn({
   boardId,
   column,
   tasks,
+  totalCount,
+  isFiltered,
   membersById,
   pendingTaskIds,
   editorsByTask,
@@ -68,8 +74,13 @@ export function BoardColumn({
       <header className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
         <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
           <span className="truncate">{column.name}</span>
-          <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-            {tasks.length}
+          <span
+            className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums"
+            aria-label={
+              isFiltered ? `${tasks.length} of ${totalCount} tasks match` : `${totalCount} tasks`
+            }
+          >
+            {isFiltered ? `${tasks.length}/${totalCount}` : totalCount}
           </span>
         </h2>
         <DropdownMenu>
@@ -140,7 +151,7 @@ export function BoardColumn({
             {provided.placeholder}
             {tasks.length === 0 && !snapshot.isDraggingOver && (
               <p className="rounded-lg border border-dashed py-6 text-center text-xs text-muted-foreground">
-                No tasks yet
+                {isFiltered ? 'No matching tasks' : 'No tasks yet'}
               </p>
             )}
           </div>
@@ -166,7 +177,7 @@ export function BoardColumn({
         onOpenChange={setConfirmDelete}
         title={`Delete “${column.name}”?`}
         description={
-          tasks.length > 0
+          totalCount > 0
             ? 'This column still has tasks. Move or delete them first — the column can only be deleted when it is empty.'
             : 'The column will be removed from this board.'
         }
