@@ -6,7 +6,7 @@ import { useEffect, type ReactNode } from 'react';
 import { ErrorState } from '@/components/feedback/error-state';
 import { PageLoader } from '@/components/feedback/page-loader';
 
-import { useSession } from '../hooks/use-session';
+import { CurrentUserContext, useSession } from '../hooks/use-session';
 
 /** Renders children only for signed-in users; everyone else is sent to /login?next=<current path>. */
 export function AuthGuard({ children }: { children: ReactNode }) {
@@ -33,7 +33,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
   if (isPending || user === null) return <PageLoader />;
-  return children;
+  return <CurrentUserContext value={user}>{children}</CurrentUserContext>;
 }
 
 /** For /login and /register: signed-in users go straight to their workspaces. */
