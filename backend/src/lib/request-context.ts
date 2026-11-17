@@ -1,3 +1,4 @@
+import { SOCKET_ID_HEADER } from '@mini-trello/shared';
 import type { Request } from 'express';
 
 import type { BoardAccess, TaskAccess } from '../modules/boards/board-access';
@@ -24,4 +25,12 @@ export function getBoardAccess(req: Request): BoardAccess {
 export function getTaskAccess(req: Request): TaskAccess {
   if (!req.taskAccess) throw new Error('requireTaskAccess middleware is missing on this route');
   return req.taskAccess;
+}
+
+const SOCKET_ID_PATTERN = /^[\w-]{1,64}$/;
+
+/** The caller's own socket, so a broadcast can skip echoing the change back to it. */
+export function getOriginSocketId(req: Request): string | undefined {
+  const value = req.get(SOCKET_ID_HEADER);
+  return value && SOCKET_ID_PATTERN.test(value) ? value : undefined;
 }

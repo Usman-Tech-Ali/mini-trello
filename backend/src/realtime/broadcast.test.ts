@@ -1,0 +1,182 @@
+import type {
+  BoardDto,
+  BoardResponse,
+  TaskDto,
+  TaskResponse,
+  WorkspaceResponse,
+} from '@mini-trello/shared';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import { startTestDatabase } from '../test/mongo-memory';
+import {
+  connectSocket,
+  joinBoard,
+  newRequestId,
+  nextEvent,
+  receives,
+  registerSessionUser,
+  restAs,
+  startRealtimeServer,
+  type ClientSocket,
+  type RealtimeTestServer,
+  type SessionUser,
+} from '../test/realtime';
+
+let stopDatabase: (() => Promise<void>) | undefined;
+let server: RealtimeTestServer;
+let alice: SessionUser;
+let bob: SessionUser;
+let workspaceId: string;
+let board: BoardDto;
+let aliceSocket: ClientSocket;
+let bobSocket: ClientSocket;
+
+const column = (index: number) => board.columns[index]?.id ?? '';
+/** Alice's REST calls carry her socket id, like the real client does. */
+const aliceApi = () => restAs(server.http, alice, aliceSocket.id);
+
+async function createTask(title: string): Promise<TaskDto> {
+  const res = await aliceApi()
+    .post(`/api/boards/${board.id}/tasks`)
+    .send({ title, columnId: column(0), requestId: newRequestId() })
+    .expect(201);
+  return (res.body as TaskResponse).task;
+}
+
+beforeAll(async () => {
+  stopDatabase = await startTestDatabase();
+  server = await startRealtimeServer();
+  alice = await registerSessionUser(server.http, 'Alice');
+  bob = await registerSessionUser(server.http, 'Bob');
+  const api = restAs(server.http, alice);
+  const ws = await api.post('/api/workspaces').send({ name: 'Live', requestId: newRequestId() });
+  workspaceId = (ws.body as WorkspaceResponse).workspace.id;
+});
+
+beforeEach(async () => {
+  const api = restAs(server.http, alice);
+  await api.post(`/api/workspaces/${workspaceId}/members`).send({ email: bob.user.email });
+  const res = await api
+    .post(`/api/workspaces/${workspaceId}/boards`)
+    .send({ name: 'Board', requestId: newRequestId() });
+  board = (res.body as BoardResponse).board;
+  aliceSocket = await connectSocket(server.url, { cookie: alice.cookie });
+  bobSocket = await connectSocket(server.url, { cookie: bob.cookie });
+  await joinBoard(aliceSocket, board.id);
+  await joinBoard(bobSocket, board.id);
+});
+
+afterEach(() => {
+  aliceSocket.close();
+  bobSocket.close();
+});
+
+afterAll(async () => {
+  await server.close();
+  await stopDatabase?.();
+});
+
+describe('task broadcasts', () => {
+  it('sends a created task to other members but not back to its sender', async () => {
+    const bobGets = nextEvent(bobSocket, 'task:created');
+    const aliceGets = receives(aliceSocket, 'task:created');
+    const task = await createTask('Live task');
+
+    expect(await bobGets).toEqual({ boardId: board.id, task });
+    expect(await aliceGets).toBe(false);
+  });
+
+  it('does not broadcast a deduplicated retry twice', async () => {
+    const body = { title: 'Once', columnId: column(0), requestId: newRequestId() };
+    const first = nextEvent(bobSocket, 'task:created');
+    await aliceApi().post(`/api/boards/${board.id}/tasks`).send(body).expect(201);
+    await first;
+
+    const second = receives(bobSocket, 'task:created');
+    await aliceApi().post(`/api/boards/${board.id}/tasks`).send(body).expect(200);
+    expect(await second).toBe(false);
+  });
+
+  it('broadcasts edits and moves with the new version', async () => {
+    const task = await createTask('Edit me');
+
+    const edited = nextEvent(bobSocket, 'task:updated');
+    await aliceApi()
+      .patch(`/api/tasks/${task.id}`)
+      .send({ version: 1, title: 'Edited' })
+      .expect(200);
+    expect((await edited).task).toMatchObject({ title: 'Edited', version: 2 });
+
+    const moved = nextEvent(bobSocket, 'task:updated');
+    await aliceApi()
+      .patch(`/api/tasks/${task.id}/move`)
+      .send({ version: 2, columnId: column(2), index: 0 })
+      .expect(200);
+    expect((await moved).task).toMatchObject({ columnId: column(2), version: 3 });
+  });
+
+  it('never broadcasts a change whose write failed', async () => {
+    const task = await createTask('Contested');
+    await aliceApi()
+      .patch(`/api/tasks/${task.id}`)
+      .send({ version: 1, title: 'First' })
+      .expect(200);
+
+    const broadcast = receives(bobSocket, 'task:updated');
+    await aliceApi()
+      .patch(`/api/tasks/${task.id}`)
+      .send({ version: 1, title: 'Stale' })
+      .expect(409);
+    expect(await broadcast).toBe(false);
+  });
+
+  it('broadcasts deletions', async () => {
+    const task = await createTask('Doomed');
+    const deleted = nextEvent(bobSocket, 'task:deleted');
+    await aliceApi().delete(`/api/tasks/${task.id}`).expect(204);
+    expect(await deleted).toEqual({ boardId: board.id, taskId: task.id });
+  });
+});
+
+describe('board broadcasts', () => {
+  it('sends the updated board when columns change', async () => {
+    const added = nextEvent(bobSocket, 'board:updated');
+    await aliceApi()
+      .post(`/api/boards/${board.id}/columns`)
+      .send({ name: 'Review', requestId: newRequestId() })
+      .expect(201);
+    expect((await added).board.columns.map((c) => c.name)).toEqual([
+      'To do',
+      'In progress',
+      'Done',
+      'Review',
+    ]);
+
+    const renamed = nextEvent(bobSocket, 'board:updated');
+    await aliceApi().patch(`/api/boards/${board.id}`).send({ name: 'Renamed' }).expect(200);
+    expect((await renamed).board.name).toBe('Renamed');
+  });
+
+  it('tells everyone on a board when it is deleted', async () => {
+    const deleted = nextEvent(bobSocket, 'board:deleted');
+    await aliceApi().delete(`/api/boards/${board.id}`).expect(204);
+    expect(await deleted).toEqual({ boardId: board.id });
+  });
+});
+
+describe('access revocation', () => {
+  it('removes a member from live board rooms as soon as they leave the workspace', async () => {
+    const revoked = nextEvent(bobSocket, 'board:access-revoked');
+    const stale = nextEvent(aliceSocket, 'board:stale');
+    await aliceApi().delete(`/api/workspaces/${workspaceId}/members/${bob.user.id}`).expect(204);
+    expect(await revoked).toEqual({ boardId: board.id });
+    expect(await stale).toEqual({ boardId: board.id });
+
+    const leaked = receives(bobSocket, 'task:created');
+    await createTask('Private now');
+    expect(await leaked).toBe(false);
+
+    const rejoin = await joinBoard(bobSocket, board.id);
+    expect(rejoin.ok).toBe(false);
+  });
+});

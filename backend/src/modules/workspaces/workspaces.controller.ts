@@ -13,6 +13,8 @@ import type { Request, Response } from 'express';
 
 import { getAuthUserId, getMembership } from '../../lib/request-context';
 import { parseIdParam, parseInput } from '../../lib/validate';
+import { revokeWorkspaceAccess, emitToBoard } from '../../realtime/realtime-server';
+import { listBoards } from '../boards/boards.service';
 import { MEMBER_NOT_FOUND } from './workspace-access';
 import {
   addMember,
@@ -63,5 +65,11 @@ export async function remove(req: Request, res: Response): Promise<void> {
   const { workspaceId, userId } = getMembership(req);
   const targetUserId = parseIdParam(req.params.userId, MEMBER_NOT_FOUND);
   await removeMember(workspaceId, userId, targetUserId);
+  // Live connections must not outlast membership: take the user out of the workspace's boards,
+  // and tell everyone else to refresh tasks (the removed member's tasks were unassigned).
+  revokeWorkspaceAccess(workspaceId, targetUserId);
+  for (const board of await listBoards(workspaceId)) {
+    emitToBoard(board.id, undefined, 'board:stale', { boardId: board.id });
+  }
   res.status(204).end();
 }
