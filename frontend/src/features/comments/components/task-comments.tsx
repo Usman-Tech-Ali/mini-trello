@@ -2,7 +2,7 @@
 
 import type { MemberDto } from '@mini-trello/shared';
 import { commentBodySchema } from '@mini-trello/shared';
-import { MessageSquareIcon } from 'lucide-react';
+import { MessageSquareIcon, PencilLineIcon } from 'lucide-react';
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 
 import { ErrorState } from '@/components/feedback/error-state';
@@ -11,6 +11,8 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { UserAvatar } from '@/components/user-avatar';
+import { useTypingSignal } from '@/features/realtime/hooks/use-typing-signal';
+import { describeCommenters } from '@/features/realtime/lib/remote-updates';
 import { formatRelative } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -25,12 +27,21 @@ import {
 } from '../lib/mentions';
 
 interface TaskCommentsProps {
+  boardId: string;
   taskId: string;
+  /** Names of other people writing a comment on this task right now. */
+  commenters: string[];
   membersById: Map<string, MemberDto>;
   currentUserId: string;
 }
 
-export function TaskComments({ taskId, membersById, currentUserId }: TaskCommentsProps) {
+export function TaskComments({
+  boardId,
+  taskId,
+  commenters,
+  membersById,
+  currentUserId,
+}: TaskCommentsProps) {
   const commentsQuery = useTaskComments(taskId);
   const comments = flattenComments(commentsQuery.data);
 
@@ -104,7 +115,14 @@ export function TaskComments({ taskId, membersById, currentUserId }: TaskComment
         </>
       )}
 
+      {commenters.length > 0 && (
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground" aria-live="polite">
+          <PencilLineIcon className="size-3.5 animate-pulse" aria-hidden="true" />
+          {describeCommenters(commenters)}…
+        </p>
+      )}
       <CommentComposer
+        boardId={boardId}
         taskId={taskId}
         mentionable={[...membersById.values()].filter((m) => m.userId !== currentUserId)}
       />
@@ -113,13 +131,16 @@ export function TaskComments({ taskId, membersById, currentUserId }: TaskComment
 }
 
 interface CommentComposerProps {
+  boardId: string;
   taskId: string;
   /** People who can be @mentioned (the author is excluded). */
   mentionable: MemberDto[];
 }
 
-function CommentComposer({ taskId, mentionable }: CommentComposerProps) {
+function CommentComposer({ boardId, taskId, mentionable }: CommentComposerProps) {
   const createComment = useCreateComment(taskId);
+  // Shows others "… is writing a comment"; stops on send, blur, 3 s idle or close.
+  const typingSignal = useTypingSignal(boardId, taskId, 'comment');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | undefined>();
   // One id per comment, reused if the same comment is retried, so the server can dedupe it.
@@ -170,6 +191,7 @@ function CommentComposer({ taskId, mentionable }: CommentComposerProps) {
       { body: parsed.data, mentionIds, requestId: requestId.current },
       {
         onSuccess: () => {
+          typingSignal.stop();
           setBody('');
           setPicked(new Map());
           setError(undefined);
@@ -217,6 +239,7 @@ function CommentComposer({ taskId, mentionable }: CommentComposerProps) {
           value={body}
           onChange={(event) => {
             setBody(event.target.value);
+            typingSignal.onActivity();
             updateMention(event.target.value, event.target.selectionStart);
             // Edited text is a different comment: it needs a new request id.
             requestId.current = null;
@@ -224,7 +247,10 @@ function CommentComposer({ taskId, mentionable }: CommentComposerProps) {
           onSelect={(event) =>
             updateMention(event.currentTarget.value, event.currentTarget.selectionStart)
           }
-          onBlur={() => setMention(null)}
+          onBlur={() => {
+            setMention(null);
+            typingSignal.stop();
+          }}
           onKeyDown={onKeyDown}
           role="combobox"
           aria-autocomplete="list"

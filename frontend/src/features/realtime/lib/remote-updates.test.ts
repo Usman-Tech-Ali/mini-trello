@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyTyping,
+  describeCommenters,
   describeEditors,
   pruneTyping,
   removeRemoteTask,
   TYPING_TTL_MS,
+  typingTaskIds,
   typingUsers,
   upsertRemoteTask,
   type TypingState,
@@ -51,16 +53,24 @@ describe('upsertRemoteTask', () => {
 describe('typing state', () => {
   it('tracks who is typing per task and clears on stop', () => {
     let state: TypingState = new Map();
-    state = applyTyping(state, { taskId: 't1', userId: 'sara', isTyping: true }, 0);
-    state = applyTyping(state, { taskId: 't1', userId: 'ali', isTyping: true }, 0);
+    state = applyTyping(state, { taskId: 't1', target: 'task', userId: 'sara', isTyping: true }, 0);
+    state = applyTyping(state, { taskId: 't1', target: 'task', userId: 'ali', isTyping: true }, 0);
     expect(typingUsers(state, 't1')).toEqual(['sara', 'ali']);
 
-    state = applyTyping(state, { taskId: 't1', userId: 'sara', isTyping: false }, 0);
+    state = applyTyping(
+      state,
+      { taskId: 't1', target: 'task', userId: 'sara', isTyping: false },
+      0,
+    );
     expect(typingUsers(state, 't1')).toEqual(['ali']);
   });
 
   it('expires indicators whose stop event never arrived', () => {
-    const state = applyTyping(new Map(), { taskId: 't1', userId: 'sara', isTyping: true }, 0);
+    const state = applyTyping(
+      new Map(),
+      { taskId: 't1', target: 'task', userId: 'sara', isTyping: true },
+      0,
+    );
     expect(pruneTyping(state, TYPING_TTL_MS - 1)).toBe(state);
     expect(typingUsers(pruneTyping(state, TYPING_TTL_MS + 1), 't1')).toEqual([]);
   });
@@ -72,5 +82,30 @@ describe('describeEditors', () => {
     expect(describeEditors(['Sara'])).toBe('Sara is editing');
     expect(describeEditors(['Sara', 'Ali'])).toBe('Sara and Ali are editing');
     expect(describeEditors(['Sara', 'Ali', 'Zoe'])).toBe('Sara and 2 others are editing');
+  });
+});
+
+describe('comment typing', () => {
+  it('keeps comment typing separate from editing the task', () => {
+    let state: TypingState = new Map();
+    state = applyTyping(
+      state,
+      { taskId: 't1', target: 'comment', userId: 'sara', isTyping: true },
+      0,
+    );
+    state = applyTyping(state, { taskId: 't2', target: 'task', userId: 'ali', isTyping: true }, 0);
+
+    expect(typingUsers(state, 't1', 'comment')).toEqual(['sara']);
+    expect(typingUsers(state, 't1', 'task')).toEqual([]);
+    expect(typingTaskIds(state, 'comment')).toEqual(['t1']);
+    expect(typingTaskIds(state, 'task')).toEqual(['t2']);
+  });
+
+  it('describes who is writing a comment', () => {
+    expect(describeCommenters(['Sara'])).toBe('Sara is writing a comment');
+    expect(describeCommenters(['Sara', 'Ali'])).toBe('Sara and Ali are writing comments');
+    expect(describeCommenters(['Sara', 'Ali', 'Zoe'])).toBe(
+      'Sara and 2 others are writing comments',
+    );
   });
 });

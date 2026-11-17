@@ -42,3 +42,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Only needed so docker-compose.yml can be read; nothing is started or deployed.
+      JWT_SECRET: ci-build-only-not-a-real-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose build

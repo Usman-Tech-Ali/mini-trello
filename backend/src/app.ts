@@ -18,6 +18,7 @@ import { workspacesRouter } from './modules/workspaces/workspaces.routes';
 
 export function createApp(): Express {
   const app = express();
+  if (config.trustProxy > 0) app.set('trust proxy', config.trustProxy);
 
   app.use(helmet());
   app.use(requestLogger);

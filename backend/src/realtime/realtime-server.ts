@@ -7,6 +7,7 @@ import type {
   ErrorCode,
   ServerToClientEvents,
   SocketFailure,
+  TypingTarget,
 } from '@mini-trello/shared';
 import { boardChannelSchema, typingSignalSchema } from '@mini-trello/shared';
 import { parse as parseCookies } from 'cookie';
@@ -27,8 +28,10 @@ interface SocketData {
   sessionExpiresAt: number;
   /** Joined boards → their workspace, so access can be revoked per workspace. */
   boards: Map<string, string>;
-  /** `${boardId}:${taskId}` keys this socket is currently typing in. */
+  /** `boardId|taskId|target` keys this socket is currently typing in. */
   typing: Set<string>;
+  /** `boardId|taskId` pairs already checked against the database (typing spam stays cheap). */
+  verifiedTasks: Set<string>;
 }
 
 type RealtimeServer = Server<
@@ -81,18 +84,35 @@ function broadcastPresence(boardId: string): void {
   });
 }
 
-function stopTyping(socket: RealtimeSocket, boardId: string, taskId: string): void {
-  if (!socket.data.typing.delete(`${boardId}:${taskId}`)) return;
-  socket
-    .to(boardRoom(boardId))
-    .emit('typing:update', { boardId, taskId, userId: socket.data.userId, isTyping: false });
+const typingKey = (boardId: string, taskId: string, target: TypingTarget) =>
+  `${boardId}|${taskId}|${target}`;
+
+function stopTyping(
+  socket: RealtimeSocket,
+  boardId: string,
+  taskId: string,
+  target: TypingTarget,
+): void {
+  if (!socket.data.typing.delete(typingKey(boardId, taskId, target))) return;
+  socket.to(boardRoom(boardId)).emit('typing:update', {
+    boardId,
+    taskId,
+    target,
+    userId: socket.data.userId,
+    isTyping: false,
+  });
 }
 
 function leaveBoard(socket: RealtimeSocket, boardId: string): void {
   if (!socket.data.boards.delete(boardId)) return;
   for (const key of [...socket.data.typing]) {
-    const [typingBoardId, taskId] = key.split(':');
-    if (typingBoardId === boardId && taskId) stopTyping(socket, boardId, taskId);
+    const [typingBoardId, taskId, target] = key.split('|');
+    if (typingBoardId === boardId && taskId && (target === 'task' || target === 'comment')) {
+      stopTyping(socket, boardId, taskId, target);
+    }
+  }
+  for (const key of [...socket.data.verifiedTasks]) {
+    if (key.startsWith(`${boardId}|`)) socket.data.verifiedTasks.delete(key);
   }
   void socket.leave(boardRoom(boardId));
   if (presence.leave(boardId, socket.data.userId, socket.id)) broadcastPresence(boardId);
@@ -128,20 +148,31 @@ function registerHandlers(socket: RealtimeSocket): void {
     if (!sessionIsValid(socket)) return;
     const result = typingSignalSchema.safeParse(payload);
     if (!result.success) return;
-    const { boardId, taskId } = result.data;
-    const key = `${boardId}:${taskId}`;
+    const { boardId, taskId, target } = result.data;
+    const key = typingKey(boardId, taskId, target);
     // Only from a board this socket was authorized to join, and only for that board's tasks.
     if (!socket.data.boards.has(boardId) || socket.data.typing.has(key)) return;
-    if (!(await TaskModel.exists({ _id: taskId, boardId }))) return;
+    const taskKey = `${boardId}|${taskId}`;
+    if (!socket.data.verifiedTasks.has(taskKey)) {
+      if (!(await TaskModel.exists({ _id: taskId, boardId }))) return;
+      socket.data.verifiedTasks.add(taskKey);
+    }
     socket.data.typing.add(key);
-    socket
-      .to(boardRoom(boardId))
-      .emit('typing:update', { boardId, taskId, userId: socket.data.userId, isTyping: true });
+    socket.to(boardRoom(boardId)).emit('typing:update', {
+      boardId,
+      taskId,
+      target,
+      userId: socket.data.userId,
+      isTyping: true,
+    });
   });
 
   socket.on('typing:stop', (payload) => {
     const result = typingSignalSchema.safeParse(payload);
-    if (result.success) stopTyping(socket, result.data.boardId, result.data.taskId);
+    if (result.success) {
+      const { boardId, taskId, target } = result.data;
+      stopTyping(socket, boardId, taskId, target);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -172,6 +203,7 @@ export function createRealtimeServer(httpServer: HttpServer): RealtimeServer {
         sessionExpiresAt: session.expiresAt,
         boards: new Map(),
         typing: new Set(),
+        verifiedTasks: new Set(),
       };
       next();
     });

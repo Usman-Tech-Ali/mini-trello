@@ -14,7 +14,7 @@ import {
   getOriginSocketId,
 } from '../../lib/request-context';
 import { parseIdParam, parseInput } from '../../lib/validate';
-import { closeBoardRoom, emitToBoard } from '../../realtime/realtime-server';
+import { closeBoardRoom, emitToBoard, emitToUser } from '../../realtime/realtime-server';
 import { assertWorkspaceAdmin } from '../workspaces/workspace-access';
 import { COLUMN_NOT_FOUND } from './board-access';
 import {
@@ -59,8 +59,9 @@ export async function rename(req: Request, res: Response<BoardResponse>): Promis
 export async function remove(req: Request, res: Response): Promise<void> {
   const { boardId, membership } = getBoardAccess(req);
   assertWorkspaceAdmin(membership);
-  await deleteBoard(boardId);
+  const notifiedUserIds = await deleteBoard(boardId);
   closeBoardRoom(boardId);
+  for (const userId of notifiedUserIds) emitToUser(userId, 'notifications:changed');
   res.status(204).end();
 }
 

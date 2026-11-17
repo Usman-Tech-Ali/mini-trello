@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 import { objectIdSchema } from './common';
 
-export const notificationTypeSchema = z.enum(['task.assigned', 'comment.mentioned']);
+export const notificationTypeSchema = z.enum([
+  'task.assigned',
+  /** The recipient was assigned before and no longer is (unassigned, reassigned or restored). */
+  'task.unassigned',
+  'comment.mentioned',
+]);
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 
 /** Newest first; `cursor` is the oldest notification id already loaded. */

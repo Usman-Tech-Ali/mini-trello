@@ -136,10 +136,31 @@ describe('typing indicators', () => {
 
     const started = nextEvent(bobSocket, 'typing:update');
     aliceSocket.emit('typing:start', { boardId, taskId });
-    expect(await started).toEqual({ boardId, taskId, userId: alice.user.id, isTyping: true });
+    expect(await started).toEqual({
+      boardId,
+      taskId,
+      target: 'task',
+      userId: alice.user.id,
+      isTyping: true,
+    });
 
     const stopped = nextEvent(bobSocket, 'typing:update');
     aliceSocket.close();
     expect(await stopped).toMatchObject({ userId: alice.user.id, isTyping: false });
+  });
+
+  it('relays typing in a comment separately from editing the task', async () => {
+    const bobSocket = await open(bob);
+    await joinBoard(bobSocket, boardId);
+    const aliceSocket = await open(alice);
+    await joinBoard(aliceSocket, boardId);
+
+    const commenting = nextEvent(bobSocket, 'typing:update');
+    aliceSocket.emit('typing:start', { boardId, taskId, target: 'comment' });
+    expect(await commenting).toMatchObject({ taskId, target: 'comment', isTyping: true });
+
+    const stopped = nextEvent(bobSocket, 'typing:update');
+    aliceSocket.emit('typing:stop', { boardId, taskId, target: 'comment' });
+    expect(await stopped).toMatchObject({ target: 'comment', isTyping: false });
   });
 });

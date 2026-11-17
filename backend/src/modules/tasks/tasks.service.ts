@@ -19,7 +19,12 @@ import { BoardModel } from '../boards/board.model';
 import { CommentModel } from '../comments/comment.model';
 import { findRevision, recordRevision } from '../history/history.service';
 import { TaskRevisionModel } from '../history/task-revision.model';
-import { createNotifications, type SentNotification } from '../notifications/notifications.service';
+import {
+  createNotifications,
+  removeTaskNotifications,
+  type NewNotification,
+  type SentNotification,
+} from '../notifications/notifications.service';
 import { MembershipModel } from '../workspaces/membership.model';
 import { evenlySpacedPositions, POSITION_STEP, positionForIndex } from '@mini-trello/shared';
 import { TaskModel } from './task.model';
@@ -113,29 +118,33 @@ interface TaskChange {
   notifications: SentNotification[];
 }
 
-/** Tells a new assignee (unless they assigned themselves; see createNotifications). */
+/**
+ * When the assignee changes, tells the new assignee they were assigned and the previous one they
+ * no longer are (covers unassigning, reassigning and restoring an older version). Nobody is told
+ * about their own change (see createNotifications).
+ */
 function assignmentNotifications(
   access: BoardAccess,
   actorId: string,
   task: Pick<TaskShape, '_id' | 'title'>,
-  assigneeId: string | null,
+  previousAssigneeId: string | null,
+  newAssigneeId: string | null,
   session: mongoose.ClientSession,
 ): Promise<SentNotification[]> {
-  if (!assigneeId) return Promise.resolve([]);
-  return createNotifications(
-    [
-      {
-        userId: assigneeId,
-        type: 'task.assigned',
-        actorId,
-        workspaceId: access.workspaceId,
-        boardId: access.boardId,
-        taskId: task._id.toString(),
-        taskTitle: task.title,
-      },
-    ],
-    session,
-  );
+  if (previousAssigneeId === newAssigneeId) return Promise.resolve([]);
+  const base = {
+    actorId,
+    workspaceId: access.workspaceId,
+    boardId: access.boardId,
+    taskId: task._id.toString(),
+    taskTitle: task.title,
+  };
+  const entries: NewNotification[] = [];
+  if (newAssigneeId) entries.push({ ...base, userId: newAssigneeId, type: 'task.assigned' });
+  if (previousAssigneeId) {
+    entries.push({ ...base, userId: previousAssigneeId, type: 'task.unassigned' });
+  }
+  return createNotifications(entries, session);
 }
 
 function activityFor(
@@ -254,6 +263,7 @@ export async function createTask(
         access,
         creatorId,
         task,
+        null,
         input.assigneeId,
         session,
       );
@@ -314,11 +324,14 @@ async function applyUpdate(
       },
       session,
     );
-    const newAssigneeId = updated.assigneeId?.toString() ?? null;
-    const reassigned = newAssigneeId !== (before.assigneeId?.toString() ?? null);
-    const notifications = reassigned
-      ? await assignmentNotifications(access, actorId, updated, newAssigneeId, session)
-      : [];
+    const notifications = await assignmentNotifications(
+      access,
+      actorId,
+      updated,
+      before.assigneeId?.toString() ?? null,
+      updated.assigneeId?.toString() ?? null,
+      session,
+    );
     return { task: toTaskDto(updated), activities, notifications };
   });
   if (!result) throw await conflictOrNotFound(access.taskId);
@@ -399,16 +412,25 @@ export async function moveTask(
 }
 
 /** Deletes the task and its comments; the activity log keeps a record of it. */
-export async function deleteTask(access: TaskAccess, actorId: string): Promise<ActivityDto[]> {
+export interface DeletedTask {
+  activities: ActivityDto[];
+  /** People whose notifications about this task were removed (their inbox changed). */
+  notifiedUserIds: string[];
+}
+
+export async function deleteTask(access: TaskAccess, actorId: string): Promise<DeletedTask> {
   return mongoose.connection.transaction(async (session) => {
     const task = await TaskModel.findOneAndDelete({ _id: access.taskId }, { session }).lean();
     if (!task) throw new AppError(404, 'NOT_FOUND', TASK_NOT_FOUND);
     await CommentModel.deleteMany({ taskId: access.taskId }, { session });
     await TaskRevisionModel.deleteMany({ taskId: access.taskId }, { session });
-    return recordActivities(
+    // Notifications would otherwise link to a task that no longer exists.
+    const notifiedUserIds = await removeTaskNotifications({ taskId: access.taskId }, session);
+    const activities = await recordActivities(
       [{ ...activityFor(access, actorId, task), action: 'task.deleted' }],
       session,
     );
+    return { activities, notifiedUserIds };
   });
 }
 

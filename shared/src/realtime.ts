@@ -19,8 +19,16 @@ export const SOCKET_ID_HEADER = 'x-socket-id';
 export const boardChannelSchema = z.object({ boardId: objectIdSchema });
 export type BoardChannelInput = z.infer<typeof boardChannelSchema>;
 
-export const typingSignalSchema = z.object({ boardId: objectIdSchema, taskId: objectIdSchema });
-export type TypingSignalInput = z.infer<typeof typingSignalSchema>;
+/** What the user is typing in: the task's fields, or a comment on the task. */
+export const typingTargetSchema = z.enum(['task', 'comment']);
+export type TypingTarget = z.infer<typeof typingTargetSchema>;
+
+export const typingSignalSchema = z.object({
+  boardId: objectIdSchema,
+  taskId: objectIdSchema,
+  target: typingTargetSchema.default('task'),
+});
+export type TypingSignalInput = z.input<typeof typingSignalSchema>;
 
 export interface SocketFailure {
   ok: false;
@@ -60,6 +68,7 @@ export interface ServerToClientEvents {
   'typing:update': (payload: {
     boardId: string;
     taskId: string;
+    target: TypingTarget;
     userId: string;
     isTyping: boolean;
   }) => void;
