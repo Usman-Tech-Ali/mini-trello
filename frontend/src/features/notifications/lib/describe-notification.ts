@@ -6,6 +6,8 @@ export function describeNotification(notification: NotificationDto): string {
   switch (notification.type) {
     case 'task.assigned':
       return `assigned you ${task}`;
+    case 'task.unassigned':
+      return `unassigned you from ${task}`;
     case 'comment.mentioned':
       return `mentioned you on ${task}`;
   }

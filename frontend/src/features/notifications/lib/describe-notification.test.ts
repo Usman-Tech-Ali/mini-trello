@@ -18,8 +18,11 @@ const base: NotificationDto = {
 };
 
 describe('describeNotification', () => {
-  it('describes assignments and mentions', () => {
+  it('describes assignments, unassignments and mentions', () => {
     expect(describeNotification(base)).toBe('assigned you “Fix login”');
+    expect(describeNotification({ ...base, type: 'task.unassigned' })).toBe(
+      'unassigned you from “Fix login”',
+    );
     expect(describeNotification({ ...base, type: 'comment.mentioned' })).toBe(
       'mentioned you on “Fix login”',
     );
