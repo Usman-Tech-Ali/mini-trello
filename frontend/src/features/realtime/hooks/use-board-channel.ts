@@ -1,4 +1,5 @@
-import type { BoardDto, ServerToClientEvents, TaskDto } from '@mini-trello/shared';
+import type { ActivityFilters, BoardDto, ServerToClientEvents, TaskDto } from '@mini-trello/shared';
+import { matchesActivityFilters } from '@mini-trello/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -99,9 +100,16 @@ export function useBoardChannel(
     };
     const onActivity = (payload: Payload<'activity:created'>) => {
       if (!forThisBoard(payload)) return;
-      queryClient.setQueryData<ActivityPages>(activityKeys.board(boardId), (data) =>
-        addActivity(data, payload.activity),
-      );
+      // Every loaded feed of this board, each with its own filters: add the entry where it fits.
+      for (const query of queryClient.getQueryCache().findAll({
+        queryKey: activityKeys.board(boardId),
+      })) {
+        const filters = (query.queryKey[3] ?? {}) as ActivityFilters;
+        if (!matchesActivityFilters(payload.activity, filters)) continue;
+        queryClient.setQueryData<ActivityPages>(query.queryKey, (data) =>
+          addActivity(data, payload.activity),
+        );
+      }
     };
     const onPresence = (payload: Payload<'presence:update'>) => {
       if (forThisBoard(payload)) setOnlineUserIds(payload.userIds);

@@ -171,3 +171,59 @@ describe('reading the feed', () => {
     expect(await ActivityModel.countDocuments({ boardId: board.id })).toBe(0);
   });
 });
+
+describe('filtering the feed', () => {
+  async function feedWith(query: string) {
+    const res = await admin.client.get(`/api/boards/${board.id}/activity?${query}`).expect(200);
+    return res.body as ActivityListResponse;
+  }
+
+  beforeEach(async () => {
+    const task = await createTask(admin, board.id, column(0), { title: 'By admin' });
+    await createTask(member, board.id, column(0), { title: 'By member' });
+    await member.client
+      .patch(`/api/tasks/${task.id}/move`)
+      .send({ version: 1, columnId: column(1), index: 0 })
+      .expect(200);
+  });
+
+  it('filters by actor and by action, and combines them', async () => {
+    const byMember = await feedWith(`actor=${member.user.id}`);
+    expect(byMember.activities.map((a) => a.action)).toEqual(['task.moved', 'task.created']);
+
+    const moves = await feedWith('action=task.moved');
+    expect(moves.activities.map((a) => a.taskTitle)).toEqual(['By admin']);
+
+    const adminMoves = await feedWith(`actor=${admin.user.id}&action=task.moved`);
+    expect(adminMoves.activities).toEqual([]);
+  });
+
+  it('filters by date range, from inclusive and to exclusive', async () => {
+    const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    const inAnHour = new Date(Date.now() + 3_600_000).toISOString();
+    expect((await feedWith(`from=${hourAgo}&to=${inAnHour}`)).activities).toHaveLength(3);
+    expect((await feedWith(`from=${inAnHour}`)).activities).toHaveLength(0);
+    expect((await feedWith(`to=${hourAgo}`)).activities).toHaveLength(0);
+  });
+
+  it('pages through filtered results with the cursor', async () => {
+    const first = await feedWith(`actor=${member.user.id}&limit=1`);
+    expect(first.activities.map((a) => a.action)).toEqual(['task.moved']);
+    const second = await feedWith(
+      `actor=${member.user.id}&limit=1&cursor=${first.nextCursor ?? ''}`,
+    );
+    expect(second.activities.map((a) => a.action)).toEqual(['task.created']);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('rejects invalid filters', async () => {
+    for (const query of [
+      'action=task.exploded',
+      'actor=someone',
+      'from=yesterday',
+      `from=${new Date().toISOString()}&to=${new Date(Date.now() - 1000).toISOString()}`,
+    ]) {
+      await admin.client.get(`/api/boards/${board.id}/activity?${query}`).expect(400);
+    }
+  });
+});

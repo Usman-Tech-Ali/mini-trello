@@ -20,6 +20,10 @@ const activitySchema = new Schema(
 
 // The board feed, newest first; `_id` is the pagination cursor (ObjectIds increase over time).
 activitySchema.index({ boardId: 1, _id: -1 });
+// "What did this person do?" and "show only moves": each stays a single index range scan,
+// newest first, even combined with the cursor and a date range on _id.
+activitySchema.index({ boardId: 1, actorId: 1, _id: -1 });
+activitySchema.index({ boardId: 1, action: 1, _id: -1 });
 
 export type Activity = InferSchemaType<typeof activitySchema>;
 
