@@ -1,0 +1,17 @@
+**/node_modules
+**/.next
+**/dist
+**/coverage
+.git
+.github
+.cache
+logs
+**/*.tsbuildinfo
+# Never send local secrets into an image
+**/.env
+**/.env.*
+!**/.env.example
+# Local notes and documents
+*.pdf
+PROJECT_CONTEXT.md
+TASK_PROGRESS.md
